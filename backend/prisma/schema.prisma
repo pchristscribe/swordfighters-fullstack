@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  DHGATE
+  ALIEXPRESS
+  AMAZON
+  WISH
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id              String        @id @default(cuid())
+  externalId      String // ID from the source platform
+  platform        Platform
+  title           String
+  description     String
+  imageUrl        String
+  price           Float
+  currency        String        @default("USD")
+  priceUpdatedAt  DateTime      @default(now())
+  categoryId      String
+  category        Category      @relation(fields: [categoryId], references: [id])
+  affiliateLinks  AffiliateLink[]
+  reviews         Review[]
+  status          ProductStatus @default(ACTIVE)
+  rating          Float?
+  reviewCount     Int           @default(0)
+  tags            String[]
+  metadata        Json? // Platform-specific data
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([platform, externalId])
+  @@index([platform])
+  @@index([categoryId])
+  @@index([status])
+  @@index([priceUpdatedAt])
+  @@map("products")
+}
+
+model AffiliateLink {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  originalUrl     String
+  trackedUrl      String // Dub.co shortened URL
+  dubLinkId       String? // Dub.co link ID for analytics
+  clicks          Int      @default(0)
+  conversions     Int      @default(0)
+  revenue         Float    @default(0)
+  lastClickedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([productId])
+  @@map("affiliate_links")
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating      Int // 1-5 stars
+  title       String?
+  content     String
+  pros        String[]
+  cons        String[]
+  authorName  String   @default("Swordfighters Team")
+  isFeatured  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@index([isFeatured])
+  @@map("reviews")
+}
