@@ -72,7 +72,7 @@ const handlePageChange = (page: number) => {
           >
             <option value="">All Categories</option>
             <option
-              v-for="category in productStore.categories"
+              v-for="category in (productStore?.categories || [])"
               :key="category.id"
               :value="category.id"
             >
@@ -109,22 +109,22 @@ const handlePageChange = (page: number) => {
     </div>
 
     <!-- Loading State -->
-    <div v-if="productStore.loading" class="text-center py-12">
+    <div v-if="productStore?.loading" class="text-center py-12">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       <p class="mt-4 text-gray-600">Loading products...</p>
     </div>
 
     <!-- Products Grid -->
-    <div v-else-if="productStore.products.length > 0" class="space-y-6">
+    <div v-else-if="(productStore?.products?.length || 0) > 0" class="space-y-6">
       <div class="flex items-center justify-between">
         <p class="text-sm text-gray-600">
-          Showing {{ productStore.products.length }} of {{ productStore.totalProducts }} products
+          Showing {{ productStore?.products?.length || 0 }} of {{ productStore?.totalProducts || 0 }} products
         </p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div
-          v-for="product in productStore.products"
+          v-for="product in (productStore?.products || [])"
           :key="product.id"
           class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
         >
@@ -161,7 +161,7 @@ const handlePageChange = (page: number) => {
       </div>
 
       <!-- Pagination -->
-      <div v-if="productStore.pagination && productStore.pagination.pages > 1" class="flex justify-center gap-2 mt-8">
+      <div v-if="productStore?.pagination && productStore.pagination.pages > 1" class="flex justify-center gap-2 mt-8">
         <button
           v-for="page in productStore.pagination.pages"
           :key="page"
@@ -182,7 +182,7 @@ const handlePageChange = (page: number) => {
     <div v-else class="text-center py-12">
       <p class="text-gray-600 mb-4">No products found</p>
       <button
-        @click="productStore.resetFilters(); productStore.fetchProducts()"
+        @click="productStore?.resetFilters(); productStore?.fetchProducts()"
         class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
       >
         Clear Filters
