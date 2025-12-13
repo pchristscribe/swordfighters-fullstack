@@ -1,4 +1,8 @@
 import { beforeAll, afterAll } from 'vitest'
+import { config } from 'dotenv'
+
+// Load environment variables from .env file
+config()
 
 // Load test environment variables
 process.env.NODE_ENV = 'test'

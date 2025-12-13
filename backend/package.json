@@ -31,7 +31,7 @@
     "@fastify/cors": "^11.1.0",
     "@fastify/env": "^5.0.3",
     "@fastify/session": "^11.1.1",
-    "@prisma/client": "^7.1.0",
+    "@prisma/client": "6.19.1",
     "@simplewebauthn/server": "^13.2.2",
     "bcryptjs": "^3.0.3",
     "bull": "^4.16.5",
@@ -43,7 +43,7 @@
   "devDependencies": {
     "@vitest/ui": "^4.0.14",
     "pino-pretty": "^13.1.2",
-    "prisma": "^7.1.0",
+    "prisma": "6.19.1",
     "vitest": "^4.0.14"
   }
 }
