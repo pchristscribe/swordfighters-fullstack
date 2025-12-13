@@ -104,50 +104,6 @@ export default async function productRoutes(fastify, options) {
     return product;
   });
 
-  // Create new product
-  fastify.post('/', async (request, reply) => {
-    const product = await prisma.product.create({
-      data: request.body,
-      include: {
-        category: true,
-      },
-    });
-
-    reply.code(201);
-    return product;
-  });
-
-  // Update product
-  fastify.patch('/:id', async (request, reply) => {
-    const { id } = request.params;
-
-    const product = await prisma.product.update({
-      where: { id },
-      data: request.body,
-      include: {
-        category: true,
-        affiliateLinks: true,
-      },
-    });
-
-    // Invalidate cache
-    await redis.del(`product:${id}`);
-
-    return product;
-  });
-
-  // Delete product
-  fastify.delete('/:id', async (request, reply) => {
-    const { id } = request.params;
-
-    await prisma.product.delete({
-      where: { id },
-    });
-
-    // Invalidate cache
-    await redis.del(`product:${id}`);
-
-    reply.code(204);
-    return;
-  });
+  // Write operations (POST, PATCH, DELETE) are only available through admin routes
+  // See: backend/src/routes/admin/products.js for authenticated admin endpoints
 }

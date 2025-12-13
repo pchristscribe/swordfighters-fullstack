@@ -55,46 +55,6 @@ export default async function categoryRoutes(fastify, options) {
     return category;
   });
 
-  // Create category
-  fastify.post('/', async (request, reply) => {
-    const category = await prisma.category.create({
-      data: request.body,
-    });
-
-    // Invalidate cache
-    await redis.del('categories:all');
-
-    reply.code(201);
-    return category;
-  });
-
-  // Update category
-  fastify.patch('/:id', async (request, reply) => {
-    const { id } = request.params;
-
-    const category = await prisma.category.update({
-      where: { id },
-      data: request.body,
-    });
-
-    // Invalidate cache
-    await redis.del('categories:all');
-
-    return category;
-  });
-
-  // Delete category
-  fastify.delete('/:id', async (request, reply) => {
-    const { id } = request.params;
-
-    await prisma.category.delete({
-      where: { id },
-    });
-
-    // Invalidate cache
-    await redis.del('categories:all');
-
-    reply.code(204);
-    return;
-  });
+  // Write operations (POST, PATCH, DELETE) are only available through admin routes
+  // See: backend/src/routes/admin/categories.js for authenticated admin endpoints
 }
