@@ -128,7 +128,7 @@ export const useAuthStore = defineStore('auth', {
 
         // Trigger browser WebAuthn registration
         console.log('🔑 Requesting TouchID/Security Key from browser...')
-        const credential = await startRegistration(optionsResponse)
+        const credential = await startRegistration({ optionsJSON: optionsResponse })
         console.log('✅ Credential created:', credential)
 
         // Send credential to server for verification
@@ -207,7 +207,7 @@ export const useAuthStore = defineStore('auth', {
 
         // Trigger browser WebAuthn authentication
         console.log('🔑 Requesting TouchID/Security Key from browser...')
-        const credential = await startAuthentication(optionsResponse)
+        const credential = await startAuthentication({ optionsJSON: optionsResponse })
         console.log('✅ Credential received from browser')
 
         // Send credential to server for verification
