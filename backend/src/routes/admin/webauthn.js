@@ -181,7 +181,7 @@ export default async function webauthnRoutes(fastify, options) {
         userDisplayName: admin.name,
         attestationType: 'none',
         excludeCredentials: validCredentials.map(cred => ({
-          id: isoBase64URL.toBuffer(cred.credentialId),
+          id: cred.credentialId,
           type: 'public-key',
           transports: cred.transports
         })),
@@ -386,7 +386,7 @@ export default async function webauthnRoutes(fastify, options) {
       const authOptions = await generateAuthenticationOptions({
         rpID: RP_ID,
         allowCredentials: validCredentials.map(cred => ({
-          id: isoBase64URL.toBuffer(cred.credentialId),
+          id: cred.credentialId,
           type: 'public-key',
           transports: Array.isArray(cred.transports) ? cred.transports : []
         })),
@@ -479,10 +479,11 @@ export default async function webauthnRoutes(fastify, options) {
         expectedChallenge: admin.currentChallenge,
         expectedOrigin: ORIGIN,
         expectedRPID: RP_ID,
-        authenticator: {
-          credentialID: isoBase64URL.toBuffer(dbCredential.credentialId),
-          credentialPublicKey: isoBase64URL.toBuffer(dbCredential.publicKey),
-          counter: Number(dbCredential.counter)
+        credential: {
+          id: dbCredential.credentialId,
+          publicKey: isoBase64URL.toBuffer(dbCredential.publicKey),
+          counter: Number(dbCredential.counter),
+          transports: dbCredential.transports
         }
       })
 

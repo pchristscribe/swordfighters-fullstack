@@ -80,7 +80,7 @@ async function testRegistration() {
     addLog('🔑 Step 3: Requesting TouchID/Security Key from browser...')
     addLog('   (You should see a system prompt now)')
 
-    const credential = await startRegistration(optionsResponse)
+    const credential = await startRegistration({ optionsJSON: optionsResponse })
 
     addLog('✅ Credential created successfully!')
     addLog(`   Credential ID length: ${credential.id?.length || 0}`)

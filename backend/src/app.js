@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
-import { RedisStore } from 'connect-redis';
+import { RedisSessionStore } from './lib/sessionStore.js';
 import prisma from './lib/prisma.js';
 import redis from './lib/redis.js';
 import productRoutes from './routes/products.js';
@@ -44,7 +44,7 @@ export async function buildApp(opts = {}) {
 
   // Register session with Redis store
   await fastify.register(session, {
-    store: new RedisStore({ client: redis }),
+    store: new RedisSessionStore(redis),
     secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-at-least-32-characters-long',
     cookie: {
       secure: process.env.NODE_ENV === 'production',
@@ -52,8 +52,7 @@ export async function buildApp(opts = {}) {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
       sameSite: 'lax'
     },
-    saveUninitialized: false,
-    resave: false
+    saveUninitialized: false
   });
 
   // Decorators for database clients
