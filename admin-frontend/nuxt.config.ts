@@ -25,7 +25,22 @@ export default defineNuxtConfig({
     head: {
       title: 'Swordfighters Admin',
       meta: [
-        { name: 'description', content: 'Admin panel for Swordfighters affiliate platform' }
+        { name: 'description', content: 'Admin panel for Swordfighters affiliate platform' },
+        // Content Security Policy - Defense against XSS attacks
+        {
+          'http-equiv': 'Content-Security-Policy',
+          content: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Nuxt requires unsafe-inline/eval for HMR in dev
+            "style-src 'self' 'unsafe-inline'", // Tailwind requires unsafe-inline
+            "img-src 'self' https: data:", // Allow HTTPS images and data URIs
+            "font-src 'self' data:",
+            "connect-src 'self' http://localhost:* https:", // Allow API connections
+            "frame-ancestors 'none'", // Prevent clickjacking
+            "base-uri 'self'",
+            "form-action 'self'"
+          ].join('; ')
+        }
       ]
     }
   },

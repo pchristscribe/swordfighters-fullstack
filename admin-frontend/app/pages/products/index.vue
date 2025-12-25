@@ -52,7 +52,7 @@
                   <td class="whitespace-nowrap py-4 pl-4 pr-3">
                     <div class="flex items-center">
                       <div class="h-10 w-10 flex-shrink-0">
-                        <img class="h-10 w-10 rounded object-cover" :src="product.imageUrl" :alt="product.title" />
+                        <img class="h-10 w-10 rounded object-cover" :src="getSafeImageUrl(product.imageUrl)" :alt="product.title" />
                       </div>
                       <div class="ml-4">
                         <div class="font-medium text-gray-900 truncate max-w-xs">{{ product.title }}</div>
@@ -334,6 +334,8 @@
 </template>
 
 <script setup lang="ts">
+import { getSafeImageUrl, isValidHttpUrl } from '~/utils/security'
+
 definePageMeta({
   middleware: ['auth'],
   layout: 'default'
@@ -456,6 +458,12 @@ const closeModal = () => {
 const saveProduct = async () => {
   if (saving.value) return // Prevent double-submission
 
+  // Validate image URL before submission
+  if (!isValidHttpUrl(formData.value.imageUrl)) {
+    alert('Invalid image URL. Please provide a valid HTTP or HTTPS URL.')
+    return
+  }
+
   saving.value = true
   try {
     // Parse tags from comma-separated input
@@ -468,7 +476,7 @@ const saveProduct = async () => {
       title: formData.value.title,
       platform: formData.value.platform,
       description: formData.value.description,
-      imageUrl: formData.value.imageUrl,
+      imageUrl: formData.value.imageUrl.trim(), // Trim whitespace
       price: parseFloat(formData.value.price.toString()),
       currency: formData.value.currency,
       status: formData.value.status,

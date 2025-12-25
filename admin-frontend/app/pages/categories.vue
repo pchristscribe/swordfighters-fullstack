@@ -81,7 +81,7 @@
                   <td class="whitespace-nowrap px-3 py-4">
                     <img
                       v-if="category.imageUrl"
-                      :src="category.imageUrl"
+                      :src="getSafeImageUrl(category.imageUrl)"
                       :alt="category.name"
                       class="h-10 w-10 rounded object-cover"
                     />
@@ -251,6 +251,8 @@
 </template>
 
 <script setup lang="ts">
+import { getSafeImageUrl, isValidHttpUrl } from '~/utils/security'
+
 definePageMeta({
   middleware: ['auth'],
   layout: 'default'
@@ -350,6 +352,12 @@ const closeModal = () => {
 const saveCategory = async () => {
   if (saving.value) return // Prevent double-submission
 
+  // Validate image URL if provided
+  if (formData.value.imageUrl && !isValidHttpUrl(formData.value.imageUrl)) {
+    alert('Invalid image URL. Please provide a valid HTTP or HTTPS URL, or leave it empty.')
+    return
+  }
+
   saving.value = true
   try {
     // Clean up form data - remove empty strings
@@ -358,7 +366,7 @@ const saveCategory = async () => {
       slug: formData.value.slug
     }
     if (formData.value.description) cleanData.description = formData.value.description
-    if (formData.value.imageUrl) cleanData.imageUrl = formData.value.imageUrl
+    if (formData.value.imageUrl) cleanData.imageUrl = formData.value.imageUrl.trim()
 
     if (editingCategory.value) {
       await $fetch(`${config.public.apiBase}/api/admin/categories/${editingCategory.value.id}`, {
