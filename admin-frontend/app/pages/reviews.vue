@@ -397,6 +397,8 @@
 </template>
 
 <script setup lang="ts">
+import { sanitizeText } from '~/utils/security'
+
 definePageMeta({
   middleware: ['auth'],
   layout: 'default'
@@ -551,19 +553,30 @@ const saveReview = async () => {
 
   saving.value = true
   try {
-    // Filter out empty pros and cons
+    // Sanitize all text inputs to prevent HTML injection
     const cleanData: any = {
       productId: formData.value.productId,
       rating: formData.value.rating,
-      content: formData.value.content,
+      content: sanitizeText(formData.value.content),
       isFeatured: formData.value.isFeatured
     }
 
-    if (formData.value.title) cleanData.title = formData.value.title
-    if (formData.value.authorName) cleanData.authorName = formData.value.authorName
+    if (formData.value.title) {
+      cleanData.title = sanitizeText(formData.value.title)
+    }
 
-    const pros = formData.value.pros.filter(p => p.trim())
-    const cons = formData.value.cons.filter(c => c.trim())
+    if (formData.value.authorName) {
+      cleanData.authorName = sanitizeText(formData.value.authorName)
+    }
+
+    // Filter empty items and sanitize
+    const pros = formData.value.pros
+      .filter(p => p.trim())
+      .map(p => sanitizeText(p))
+    const cons = formData.value.cons
+      .filter(c => c.trim())
+      .map(c => sanitizeText(c))
+
     if (pros.length > 0) cleanData.pros = pros
     if (cons.length > 0) cleanData.cons = cons
 

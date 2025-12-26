@@ -53,6 +53,11 @@ export function getSafeImageUrl(url: string | null | undefined, fallback = '/pla
  *
  * @param text - Text to sanitize
  * @returns Sanitized text
+ * Removes dangerous tags with their content, and strips all other HTML tags
+ * Vue already escapes {{ }} interpolations, but this provides extra safety
+ *
+ * @param text - Text to sanitize
+ * @returns Sanitized text with HTML removed
  */
 export function sanitizeText(text: string | null | undefined): string {
   if (!text || typeof text !== 'string') {
@@ -61,4 +66,18 @@ export function sanitizeText(text: string | null | undefined): string {
 
   // Remove any HTML tags
   return text.replace(/<[^>]*>/g, '')
+  let sanitized = text
+
+  // First, remove dangerous tags AND their content (case-insensitive)
+  // These tags should be completely removed, not just stripped
+  const dangerousTags = ['script', 'style', 'iframe', 'object', 'embed']
+  dangerousTags.forEach(tag => {
+    const regex = new RegExp(`<${tag}[^>]*>.*?</${tag}>`, 'gis')
+    sanitized = sanitized.replace(regex, '')
+  })
+
+  // Then remove all remaining HTML tags (but preserve their text content)
+  sanitized = sanitized.replace(/<[^>]*>/g, '')
+
+  return sanitized
 }
