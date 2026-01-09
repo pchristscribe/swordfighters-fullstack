@@ -30,7 +30,7 @@ export interface Product {
   rating?: number
   reviewCount: number
   tags: string[]
-  metadata?: any
+  metadata?: Record<string, unknown>
   createdAt: string
   updatedAt: string
   affiliateLinks?: AffiliateLink[]

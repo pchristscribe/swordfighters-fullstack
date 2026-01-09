@@ -30,8 +30,8 @@ export const useProductStore = defineStore('products', {
         this.products = data.products
         this.pagination = data.pagination
         this.filters = mergedFilters
-      } catch (err: any) {
-        this.error = err.message || 'Failed to fetch products'
+      } catch (err: unknown) {
+        this.error = err instanceof Error ? err.message : 'Failed to fetch products'
         console.error('Error fetching products:', err)
       } finally {
         this.loading = false
@@ -45,8 +45,8 @@ export const useProductStore = defineStore('products', {
       try {
         const api = useApi()
         this.currentProduct = await api.getProduct(id)
-      } catch (err: any) {
-        this.error = err.message || 'Failed to fetch product'
+      } catch (err: unknown) {
+        this.error = err instanceof Error ? err.message : 'Failed to fetch product'
         console.error('Error fetching product:', err)
       } finally {
         this.loading = false
@@ -57,7 +57,7 @@ export const useProductStore = defineStore('products', {
       try {
         const api = useApi()
         this.categories = await api.getCategories()
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching categories:', err)
       }
     },

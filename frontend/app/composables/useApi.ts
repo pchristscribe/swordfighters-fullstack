@@ -1,8 +1,17 @@
+import type { Product, Category, Pagination } from '~/types'
+
+interface FetchOptions {
+  method?: string
+  headers?: Record<string, string>
+  body?: unknown
+  params?: Record<string, unknown>
+}
+
 export const useApi = () => {
   const config = useRuntimeConfig()
   const apiBase = config.public.apiBase
 
-  const apiFetch = async <T>(endpoint: string, options: any = {}): Promise<T> => {
+  const apiFetch = async <T>(endpoint: string, options: FetchOptions = {}): Promise<T> => {
     const url = `${apiBase}/api${endpoint}`
 
     try {
@@ -14,7 +23,7 @@ export const useApi = () => {
         },
       })
       return data
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`API Error [${endpoint}]:`, error)
       throw error
     }
@@ -22,17 +31,17 @@ export const useApi = () => {
 
   return {
     // Products
-    getProducts: (params?: Record<string, any>) =>
-      apiFetch<{ products: any[]; pagination: any }>('/products', { params }),
+    getProducts: (params?: Record<string, unknown>) =>
+      apiFetch<{ products: Product[]; pagination: Pagination }>('/products', { params }),
 
     getProduct: (id: string) =>
-      apiFetch<any>(`/products/${id}`),
+      apiFetch<Product>(`/products/${id}`),
 
     // Categories
     getCategories: () =>
-      apiFetch<any[]>('/categories'),
+      apiFetch<Category[]>('/categories'),
 
     getCategory: (identifier: string) =>
-      apiFetch<any>(`/categories/${identifier}`),
+      apiFetch<Category>(`/categories/${identifier}`),
   }
 }
