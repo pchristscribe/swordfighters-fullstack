@@ -25,10 +25,12 @@ const discountPercentage = computed(() => {
   <div class="product-card">
     <img :src="product.imageUrl" :alt="product.title" />
     <h3>{{ product.title }}</h3>
-    <div v-if="showDiscount && discountPercentage > 0" class="discount">
+    <div v-if="showDiscount && discountPercentage !== 0" class="discount">
       {{ discountPercentage }}% OFF
     </div>
     <p class="price">${{ product.price }}</p>
-    <button @click="emit('add-to-cart', product)">Add to Cart</button>
+    <button @click="emit('add-to-cart', product)">
+      Add to Cart
+    </button>
   </div>
 </template>

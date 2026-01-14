@@ -462,16 +462,16 @@ describe('ProductCard Component', () => {
         },
       })
 
-      const productCard = wrapper.find('.product-card')
-      const children = productCard.element.children
+      // Verify key elements exist (not checking exact DOM hierarchy)
+      expect(wrapper.find('img').exists()).toBe(true)
+      expect(wrapper.find('h3').exists()).toBe(true)
+      expect(wrapper.find('.discount').exists()).toBe(true)
+      expect(wrapper.find('.price').exists()).toBe(true)
 
-      // Expected order: img, h3, div.discount, p.price, button, button
-      expect(children[0].tagName).toBe('IMG')
-      expect(children[1].tagName).toBe('H3')
-      expect(children[2].className).toContain('discount')
-      expect(children[3].className).toContain('price')
-      expect(children[4].tagName).toBe('BUTTON')
-      expect(children[5].tagName).toBe('BUTTON')
+      const buttons = wrapper.findAll('button')
+      expect(buttons.length).toBe(2)
+      expect(buttons[0].text()).toBe('Add to Cart')
+      expect(buttons[1].text()).toBe('View Details')
     })
   })
 

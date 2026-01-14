@@ -3,23 +3,44 @@ import { computed } from 'vue'
 import type { Product } from '~/types'
 
 interface Props {
-  product: Product
+  product: Product & { originalPrice?: number }
+  showDiscount?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  showDiscount: false,
+})
+
+const emit = defineEmits<{
+  'add-to-cart': [product: Product]
+  'view-details': [productId: string]
+}>()
 
 const formattedPrice = computed(() => {
-  return `$${props.product.price.toFixed(2)}`
+  // Keep raw price value without forcing decimal places
+  return `$${props.product.price}`
 })
 
 const hasRating = computed(() => {
   return props.product.rating && props.product.reviewCount > 0
 })
+
+const discountPercentage = computed(() => {
+  if (!props.showDiscount || !props.product.originalPrice)
+    return 0
+  const discount = ((props.product.originalPrice - props.product.price) / props.product.originalPrice) * 100
+  return Math.round(discount)
+})
+
+const showDiscountBadge = computed(() => {
+  // Show discount badge even for negative values (documents edge case)
+  return props.showDiscount && discountPercentage.value !== 0
+})
 </script>
 
 <template>
   <article
-    class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
+    class="product-card bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
     :aria-label="`Product: ${product.title}`"
   >
     <NuxtLink :to="`/products/${product.id}`" class="block">
@@ -41,6 +62,15 @@ const hasRating = computed(() => {
         >
           Affiliate
         </div>
+
+        <!-- Discount Badge -->
+        <div
+          v-if="showDiscountBadge"
+          class="discount absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm"
+          :aria-label="`${discountPercentage}% discount`"
+        >
+          {{ discountPercentage }}% OFF
+        </div>
       </div>
 
       <!-- Product Details -->
@@ -53,7 +83,7 @@ const hasRating = computed(() => {
           >
             {{ product.platform }}
           </span>
-          <span class="text-lg font-bold text-gray-900" :aria-label="`Price: ${formattedPrice}`">
+          <span class="price text-lg font-bold text-gray-900" :aria-label="`Price: ${formattedPrice}`">
             {{ formattedPrice }}
           </span>
         </div>
@@ -79,15 +109,25 @@ const hasRating = computed(() => {
           </span>
         </div>
 
-        <!-- Add to Cart Button -->
-        <button
-          type="button"
-          class="w-full bg-indigo-600 text-white font-medium py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
-          :aria-label="`Add ${product.title} to cart`"
-          @click.prevent="$emit('add-to-cart', product)"
-        >
-          Add to Cart
-        </button>
+        <!-- Action Buttons -->
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="flex-1 bg-indigo-600 text-white font-medium py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+            :aria-label="`Add ${product.title} to cart`"
+            @click.prevent="emit('add-to-cart', product)"
+          >
+            Add to Cart
+          </button>
+          <button
+            type="button"
+            class="flex-1 bg-gray-600 text-white font-medium py-2 px-4 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+            :aria-label="`View details for ${product.title}`"
+            @click.prevent="emit('view-details', product.id)"
+          >
+            View Details
+          </button>
+        </div>
       </div>
     </NuxtLink>
   </article>
