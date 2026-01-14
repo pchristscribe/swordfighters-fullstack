@@ -5,34 +5,46 @@ import { cleanupExpiredChallenges, isValidChallenge } from '../cleanupExpiredCha
 const prisma = new PrismaClient();
 
 describe('cleanupExpiredChallenges', () => {
-  let testAdmin;
+  // Use a timestamp-based prefix to isolate this test's data
+  // This ensures our test data won't be affected by other test cleanup hooks
+  const testEmailPrefix = `cleanup-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
   beforeEach(async () => {
-    // Create a test admin
-    testAdmin = await prisma.admin.create({
-      data: {
-        email: `test-${Date.now()}@example.com`,
-        name: 'Test Admin',
-        role: 'admin',
-        isActive: true
+    // Ensure admin doesn't exist before creating (in case of partial cleanup)
+    await prisma.admin.deleteMany({
+      where: {
+        email: {
+          startsWith: testEmailPrefix
+        }
       }
     });
   });
 
   afterEach(async () => {
-    // Clean up test data
-    if (testAdmin) {
-      await prisma.admin.delete({
-        where: { id: testAdmin.id }
-      }).catch(() => {});
-    }
+    // Clean up all test data created by this test suite
+    await prisma.admin.deleteMany({
+      where: {
+        email: {
+          startsWith: testEmailPrefix
+        }
+      }
+    });
   });
 
   it('should clean up expired challenges', async () => {
-    // Set an expired challenge
-    await prisma.admin.update({
-      where: { id: testAdmin.id },
+    // Create test admin with expired challenge in a single operation
+    const testEmail = `${testEmailPrefix}-expired-challenge@test.com`;
+
+    // First ensure no leftover test data
+    await prisma.admin.deleteMany({ where: { email: testEmail } });
+
+    // Create admin with expired challenge
+    const testAdmin = await prisma.admin.create({
       data: {
+        email: testEmail,
+        name: 'Test Admin',
+        role: 'admin',
+        isActive: true,
         currentChallenge: 'test-challenge',
         challengeExpiresAt: new Date(Date.now() - 1000) // 1 second ago
       }
@@ -43,22 +55,32 @@ describe('cleanupExpiredChallenges', () => {
 
     expect(count).toBe(1);
 
-    // Verify challenge was cleared
+    // Verify challenge was cleared by re-querying from database
     const admin = await prisma.admin.findUnique({
       where: { id: testAdmin.id }
     });
 
+    expect(admin).not.toBeNull();
     expect(admin.currentChallenge).toBeNull();
     expect(admin.challengeExpiresAt).toBeNull();
   });
 
   it('should not clean up valid challenges', async () => {
-    // Set a valid challenge (expires in 5 minutes)
-    await prisma.admin.update({
-      where: { id: testAdmin.id },
+    // Create test admin with valid challenge in a single operation
+    const testEmail = `${testEmailPrefix}-valid-challenge@test.com`;
+
+    // First ensure no leftover test data
+    await prisma.admin.deleteMany({ where: { email: testEmail } });
+
+    // Create admin with valid challenge
+    const testAdmin = await prisma.admin.create({
       data: {
+        email: testEmail,
+        name: 'Test Admin',
+        role: 'admin',
+        isActive: true,
         currentChallenge: 'test-challenge',
-        challengeExpiresAt: new Date(Date.now() + 5 * 60 * 1000)
+        challengeExpiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes from now
       }
     });
 
@@ -72,11 +94,13 @@ describe('cleanupExpiredChallenges', () => {
       where: { id: testAdmin.id }
     });
 
+    expect(admin).not.toBeNull();
     expect(admin.currentChallenge).toBe('test-challenge');
     expect(admin.challengeExpiresAt).not.toBeNull();
   });
 
   it('should return 0 when no expired challenges exist', async () => {
+    // No test data created - should find nothing to cleanup
     const count = await cleanupExpiredChallenges(prisma);
     expect(count).toBe(0);
   });
