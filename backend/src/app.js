@@ -13,6 +13,8 @@ import adminProductRoutes from './routes/admin/products.js';
 import adminCategoryRoutes from './routes/admin/categories.js';
 import adminReviewRoutes from './routes/admin/reviews.js';
 import { cleanupMiddleware } from './utils/cleanupExpiredChallenges.js';
+import { initSentry, captureException } from './lib/sentry.js';
+import Sentry from '@sentry/node';
 
 export async function buildApp(opts = {}) {
   const fastify = Fastify({
@@ -30,6 +32,9 @@ export async function buildApp(opts = {}) {
           : undefined,
     },
   });
+
+  // Initialize Sentry for error tracking
+  initSentry(fastify);
 
   // Register CORS - allow both frontend and admin app
   await fastify.register(cors, {
@@ -59,9 +64,82 @@ export async function buildApp(opts = {}) {
   fastify.decorate('prisma', prisma);
   fastify.decorate('redis', redis);
 
+  // Sentry request tracking
+  // Note: Using getCurrentHub() for compatibility with Sentry SDK v7+
+  fastify.addHook('onRequest', async (request, reply) => {
+    // Set user context if available (from session)
+    if (request.session?.adminId) {
+      Sentry.setUser({ id: request.session.adminId });
+    }
+
+    // Start a new Sentry span for performance tracking
+    const hub = Sentry.getCurrentHub();
+    const transaction = hub.startTransaction({
+      op: 'http.server',
+      name: `${request.method} ${request.routeOptions?.url || request.url}`,
+      data: {
+        'http.method': request.method,
+        'http.url': request.url,
+        'http.route': request.routeOptions?.url || request.url,
+      },
+    });
+
+    // Set transaction on hub
+    hub.configureScope((scope) => scope.setSpan(transaction));
+
+    // Store transaction reference for later
+    request.sentryTransaction = transaction;
+  });
+
+  fastify.addHook('onResponse', async (request, reply) => {
+    // Finish the Sentry transaction and set response status
+    if (request.sentryTransaction) {
+      request.sentryTransaction.setHttpStatus(reply.statusCode);
+      request.sentryTransaction.setStatus(reply.statusCode >= 400 ? 'error' : 'ok');
+      request.sentryTransaction.finish();
+    }
+  });
+
   // Add cleanup middleware for expired WebAuthn challenges
   // Runs asynchronously on each request without blocking
   fastify.addHook('onRequest', cleanupMiddleware);
+
+  // Global error handler - capture all unhandled errors in Sentry
+  fastify.setErrorHandler(async (error, request, reply) => {
+    // Log the error
+    request.log.error(error);
+
+    // Capture exception in Sentry with request context
+    // Note: All sensitive data is automatically sanitized via beforeSend hook
+    captureException(error, {
+      tags: {
+        route: request.routeOptions?.url || request.url,
+        method: request.method,
+        statusCode: error.statusCode || 500,
+      },
+      extra: {
+        url: request.url,
+        params: request.params,
+        query: request.query,
+        body: request.body,
+        headers: request.headers,
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
+      },
+      user: request.session?.adminId ? { id: request.session.adminId } : undefined,
+    });
+
+    // Determine status code
+    const statusCode = error.statusCode || 500;
+
+    // Send error response
+    reply.code(statusCode).send({
+      error: true,
+      message: statusCode === 500 ? 'Internal Server Error' : error.message,
+      statusCode,
+      ...(process.env.NODE_ENV !== 'production' && { stack: error.stack }),
+    });
+  });
 
   // Health check route
   fastify.get('/health', async (request, reply) => {
