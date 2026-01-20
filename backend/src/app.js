@@ -65,31 +65,37 @@ export async function buildApp(opts = {}) {
   fastify.decorate('redis', redis);
 
   // Sentry request tracking
+  // Note: Using getCurrentHub() for compatibility with Sentry SDK v7+
   fastify.addHook('onRequest', async (request, reply) => {
-    // Start a new Sentry transaction for each request
-    const transaction = Sentry.startTransaction({
-      op: 'http.server',
-      name: `${request.method} ${request.routeOptions?.url || request.url}`,
-      data: {
-        method: request.method,
-        url: request.url,
-        headers: request.headers,
-      },
-    });
-
-    // Store transaction on request for later use
-    request.sentryTransaction = transaction;
-
     // Set user context if available (from session)
     if (request.session?.adminId) {
       Sentry.setUser({ id: request.session.adminId });
     }
+
+    // Start a new Sentry span for performance tracking
+    const hub = Sentry.getCurrentHub();
+    const transaction = hub.startTransaction({
+      op: 'http.server',
+      name: `${request.method} ${request.routeOptions?.url || request.url}`,
+      data: {
+        'http.method': request.method,
+        'http.url': request.url,
+        'http.route': request.routeOptions?.url || request.url,
+      },
+    });
+
+    // Set transaction on hub
+    hub.configureScope((scope) => scope.setSpan(transaction));
+
+    // Store transaction reference for later
+    request.sentryTransaction = transaction;
   });
 
   fastify.addHook('onResponse', async (request, reply) => {
-    // Finish the Sentry transaction
+    // Finish the Sentry transaction and set response status
     if (request.sentryTransaction) {
       request.sentryTransaction.setHttpStatus(reply.statusCode);
+      request.sentryTransaction.setStatus(reply.statusCode >= 400 ? 'error' : 'ok');
       request.sentryTransaction.finish();
     }
   });
@@ -104,10 +110,12 @@ export async function buildApp(opts = {}) {
     request.log.error(error);
 
     // Capture exception in Sentry with request context
+    // Note: All sensitive data is automatically sanitized via beforeSend hook
     captureException(error, {
       tags: {
         route: request.routeOptions?.url || request.url,
         method: request.method,
+        statusCode: error.statusCode || 500,
       },
       extra: {
         url: request.url,
@@ -115,6 +123,8 @@ export async function buildApp(opts = {}) {
         query: request.query,
         body: request.body,
         headers: request.headers,
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
       },
       user: request.session?.adminId ? { id: request.session.adminId } : undefined,
     });
