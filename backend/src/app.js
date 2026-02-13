@@ -14,7 +14,7 @@ import adminCategoryRoutes from './routes/admin/categories.js';
 import adminReviewRoutes from './routes/admin/reviews.js';
 import { cleanupMiddleware } from './utils/cleanupExpiredChallenges.js';
 import { initSentry, captureException } from './lib/sentry.js';
-import Sentry from '@sentry/node';
+import * as Sentry from '@sentry/node';
 
 export async function buildApp(opts = {}) {
   const fastify = Fastify({
@@ -64,39 +64,10 @@ export async function buildApp(opts = {}) {
   fastify.decorate('prisma', prisma);
   fastify.decorate('redis', redis);
 
-  // Sentry request tracking
-  // Note: Using getCurrentHub() for compatibility with Sentry SDK v7+
+  // Sentry user context tracking
   fastify.addHook('onRequest', async (request, reply) => {
-    // Set user context if available (from session)
     if (request.session?.adminId) {
       Sentry.setUser({ id: request.session.adminId });
-    }
-
-    // Start a new Sentry span for performance tracking
-    const hub = Sentry.getCurrentHub();
-    const transaction = hub.startTransaction({
-      op: 'http.server',
-      name: `${request.method} ${request.routeOptions?.url || request.url}`,
-      data: {
-        'http.method': request.method,
-        'http.url': request.url,
-        'http.route': request.routeOptions?.url || request.url,
-      },
-    });
-
-    // Set transaction on hub
-    hub.configureScope((scope) => scope.setSpan(transaction));
-
-    // Store transaction reference for later
-    request.sentryTransaction = transaction;
-  });
-
-  fastify.addHook('onResponse', async (request, reply) => {
-    // Finish the Sentry transaction and set response status
-    if (request.sentryTransaction) {
-      request.sentryTransaction.setHttpStatus(reply.statusCode);
-      request.sentryTransaction.setStatus(reply.statusCode >= 400 ? 'error' : 'ok');
-      request.sentryTransaction.finish();
     }
   });
 
