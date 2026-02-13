@@ -7,12 +7,13 @@ export default defineNuxtConfig({
     port: 3000,
   },
 
-  modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt', 'nuxt-headlessui'],
-   
+  modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt', 'nuxt-headlessui', '@sentry/nuxt/module'],
+
   // Optionally change the default prefix.
   headlessui: {
     prefix: 'Headless'
   },
+
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3000',
@@ -36,5 +37,15 @@ export default defineNuxtConfig({
         port: 24677 // Changed to avoid conflict with admin-frontend
       }
     }
+  },
+
+  sentry: {
+    org: 'swordfighters',
+    project: 'javascript-nuxt',
+    autoInjectServerSentry: 'top-level-import'
+  },
+
+  sourcemap: {
+    client: 'hidden'
   }
 })

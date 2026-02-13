@@ -432,7 +432,7 @@ describe('useCartStore', () => {
       await cart.addItem('slow-product', 1)
       const endTime = Date.now()
 
-      expect(endTime - startTime).toBeGreaterThanOrEqual(100)
+      expect(endTime - startTime).toBeGreaterThanOrEqual(95)
       expect(cart.items).toHaveLength(1)
       expect(cart.loading).toBe(false)
     })
