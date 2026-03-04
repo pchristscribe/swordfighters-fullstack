@@ -17,6 +17,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3000',
+      sentryDsn: process.env.SENTRY_DSN || '',
     },
   },
 
@@ -40,8 +41,9 @@ export default defineNuxtConfig({
   },
 
   sentry: {
-    org: 'swordfighters',
-    project: 'javascript-nuxt',
+    org: process.env.SENTRY_ORG || 'swordfighters',
+    project: process.env.SENTRY_PROJECT || 'javascript-nuxt',
+    authToken: process.env.SENTRY_AUTH_TOKEN,
     autoInjectServerSentry: 'top-level-import'
   },
 
