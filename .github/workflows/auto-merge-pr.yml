@@ -1,0 +1,37 @@
+name: Auto Create and Merge PR
+
+on:
+  push:
+    branches:
+      - 'claude/create-pr-merge-7erya'
+
+jobs:
+  create-and-merge-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create PR if not exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING_PR=$(gh pr list --head claude/create-pr-merge-7erya --base main --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -z "$EXISTING_PR" ]; then
+            gh pr create \
+              --base main \
+              --head claude/create-pr-merge-7erya \
+              --title "chore(deps): update backend and admin-frontend dependencies" \
+              --body "Updates backend and admin-frontend package dependencies."
+          fi
+
+      - name: Merge PR and delete branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list --head claude/create-pr-merge-7erya --base main --json number --jq '.[0].number')
+          gh pr merge "$PR_NUMBER" --merge --delete-branch
