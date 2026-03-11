@@ -12,12 +12,27 @@ export default defineNuxtConfig({
 
   modules: [
     '@pinia/nuxt',
-    '@nuxtjs/tailwindcss'
+    '@nuxtjs/tailwindcss',
+    '@nuxtjs/supabase',
   ],
 
+  supabase: {
+    url: process.env.NUXT_PUBLIC_SUPABASE_URL,
+    key: process.env.NUXT_PUBLIC_SUPABASE_KEY,
+    serviceKey: process.env.SUPABASE_SECRET_KEY,
+    redirectOptions: {
+      login: '/login',
+      callback: '/confirm',
+      exclude: ['/*'],
+    },
+  },
+
   runtimeConfig: {
+    supabaseSecretKey: process.env.SUPABASE_SECRET_KEY || '',
     public: {
-      apiBase: process.env.API_BASE_URL || 'http://localhost:3001'
+      apiBase: process.env.API_BASE_URL || 'http://localhost:3001',
+      supabaseUrl: process.env.NUXT_PUBLIC_SUPABASE_URL || '',
+      supabaseKey: process.env.NUXT_PUBLIC_SUPABASE_KEY || '',
     }
   },
 
@@ -35,7 +50,7 @@ export default defineNuxtConfig({
             "style-src 'self' 'unsafe-inline'", // Tailwind requires unsafe-inline
             "img-src 'self' https: data:", // Allow HTTPS images and data URIs
             "font-src 'self' data:",
-            "connect-src 'self' http://localhost:* https:", // Allow API connections
+            "connect-src 'self' http://localhost:* https: wss://oqkfirmzkdfkfcvzqipo.supabase.co", // Allow API and Supabase connections
             "frame-ancestors 'none'", // Prevent clickjacking
             "base-uri 'self'",
             "form-action 'self'"
