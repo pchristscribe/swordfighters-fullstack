@@ -23,9 +23,9 @@ export const useProductStore = defineStore('products', {
       this.error = null
 
       try {
-        const api = useApi()
+        const supabaseProducts = useSupabaseProducts()
         const mergedFilters = { ...this.filters, ...filters }
-        const data = await api.getProducts(mergedFilters)
+        const data = await supabaseProducts.getProducts(mergedFilters)
 
         this.products = data.products
         this.pagination = data.pagination
@@ -43,8 +43,8 @@ export const useProductStore = defineStore('products', {
       this.error = null
 
       try {
-        const api = useApi()
-        this.currentProduct = await api.getProduct(id)
+        const supabaseProducts = useSupabaseProducts()
+        this.currentProduct = await supabaseProducts.getProduct(id)
       } catch (err: unknown) {
         this.error = err instanceof Error ? err.message : 'Failed to fetch product'
         console.error('Error fetching product:', err)
@@ -55,8 +55,8 @@ export const useProductStore = defineStore('products', {
 
     async fetchCategories() {
       try {
-        const api = useApi()
-        this.categories = await api.getCategories()
+        const supabaseProducts = useSupabaseProducts()
+        this.categories = await supabaseProducts.getCategories()
       } catch (err: unknown) {
         console.error('Error fetching categories:', err)
       }
