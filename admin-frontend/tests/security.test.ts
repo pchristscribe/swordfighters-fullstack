@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { isValidHttpUrl, getSafeImageUrl, sanitizeText } from '~/utils/security'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { isValidHttpUrl, getSafeImageUrl, sanitizeText, generateCsrfToken, getOrCreateCsrfToken, rotateCsrfToken, clearCsrfToken } from '~/utils/security'
 
 describe('Security Utilities', () => {
   describe('isValidHttpUrl', () => {
@@ -379,6 +379,96 @@ describe('Security Utilities', () => {
       it('should handle author names with HTML', () => {
         const maliciousAuthor = 'John<script>alert(1)</script>Doe'
         expect(sanitizeText(maliciousAuthor)).toBe('JohnDoe')
+      })
+    })
+  })
+
+  describe('CSRF Token Utilities', () => {
+    // Mock sessionStorage for tests
+    const sessionStorageMock = (() => {
+      let store: Record<string, string> = {}
+      return {
+        getItem: (key: string) => store[key] ?? null,
+        setItem: (key: string, value: string) => { store[key] = value },
+        removeItem: (key: string) => { delete store[key] },
+        clear: () => { store = {} },
+      }
+    })()
+
+    beforeEach(() => {
+      sessionStorageMock.clear()
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        value: sessionStorageMock,
+        writable: true,
+      })
+    })
+
+    describe('generateCsrfToken', () => {
+      it('should return a non-empty string', () => {
+        const token = generateCsrfToken()
+        expect(typeof token).toBe('string')
+        expect(token.length).toBeGreaterThan(0)
+      })
+
+      it('should return a 64-character hex string (32 bytes)', () => {
+        const token = generateCsrfToken()
+        expect(token).toMatch(/^[0-9a-f]{64}$/)
+      })
+
+      it('should generate unique tokens on each call', () => {
+        const tokens = new Set(Array.from({ length: 10 }, () => generateCsrfToken()))
+        expect(tokens.size).toBe(10)
+      })
+    })
+
+    describe('getOrCreateCsrfToken', () => {
+      it('should create a token if none exists', () => {
+        const token = getOrCreateCsrfToken()
+        expect(token).toMatch(/^[0-9a-f]{64}$/)
+      })
+
+      it('should return the same token on subsequent calls', () => {
+        const token1 = getOrCreateCsrfToken()
+        const token2 = getOrCreateCsrfToken()
+        expect(token1).toBe(token2)
+      })
+
+      it('should persist the token in sessionStorage', () => {
+        const token = getOrCreateCsrfToken()
+        expect(sessionStorageMock.getItem('csrf-token')).toBe(token)
+      })
+
+      it('should reuse an existing token from sessionStorage', () => {
+        const existingToken = 'a'.repeat(64)
+        sessionStorageMock.setItem('csrf-token', existingToken)
+        expect(getOrCreateCsrfToken()).toBe(existingToken)
+      })
+    })
+
+    describe('rotateCsrfToken', () => {
+      it('should return a new token', () => {
+        const token = rotateCsrfToken()
+        expect(token).toMatch(/^[0-9a-f]{64}$/)
+      })
+
+      it('should replace the existing token in sessionStorage', () => {
+        const original = getOrCreateCsrfToken()
+        const rotated = rotateCsrfToken()
+        expect(rotated).not.toBe(original)
+        expect(sessionStorageMock.getItem('csrf-token')).toBe(rotated)
+      })
+    })
+
+    describe('clearCsrfToken', () => {
+      it('should remove the token from sessionStorage', () => {
+        getOrCreateCsrfToken()
+        expect(sessionStorageMock.getItem('csrf-token')).not.toBeNull()
+        clearCsrfToken()
+        expect(sessionStorageMock.getItem('csrf-token')).toBeNull()
+      })
+
+      it('should not throw if no token exists', () => {
+        expect(() => clearCsrfToken()).not.toThrow()
       })
     })
   })
