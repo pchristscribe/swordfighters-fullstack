@@ -471,5 +471,140 @@ describe('Security Utilities', () => {
         expect(() => clearCsrfToken()).not.toThrow()
       })
     })
+
+    describe('Return type correctness', () => {
+      it('generateCsrfToken always returns a primitive string, never null/undefined/object', () => {
+        const token = generateCsrfToken()
+        expect(typeof token).toBe('string')
+        expect(token).not.toBeNull()
+        expect(token).not.toBeUndefined()
+        expect(Array.isArray(token)).toBe(false)
+        expect(token instanceof Object).toBe(false)
+      })
+
+      it('getOrCreateCsrfToken always returns a primitive string', () => {
+        const token = getOrCreateCsrfToken()
+        expect(typeof token).toBe('string')
+        expect(token).not.toBeNull()
+        expect(token).not.toBeUndefined()
+      })
+
+      it('getOrCreateCsrfToken returns empty string (not null/undefined) in SSR context', () => {
+        const originalWindow = globalThis.window
+        // @ts-expect-error intentionally deleting window to simulate SSR
+        delete globalThis.window
+        const token = getOrCreateCsrfToken()
+        expect(typeof token).toBe('string')
+        expect(token).toBe('')
+        // @ts-expect-error restoring window
+        globalThis.window = originalWindow
+      })
+
+      it('rotateCsrfToken always returns a primitive string', () => {
+        const token = rotateCsrfToken()
+        expect(typeof token).toBe('string')
+        expect(token).not.toBeNull()
+        expect(token).not.toBeUndefined()
+      })
+
+      it('rotateCsrfToken returns empty string (not null/undefined) in SSR context', () => {
+        const originalWindow = globalThis.window
+        // @ts-expect-error intentionally deleting window to simulate SSR
+        delete globalThis.window
+        const token = rotateCsrfToken()
+        expect(typeof token).toBe('string')
+        expect(token).toBe('')
+        // @ts-expect-error restoring window
+        globalThis.window = originalWindow
+      })
+
+      it('clearCsrfToken returns undefined (void), not the old token value', () => {
+        getOrCreateCsrfToken()
+        const result = clearCsrfToken()
+        expect(result).toBeUndefined()
+      })
+
+      it('token stored in sessionStorage is a plain string, not JSON-encoded', () => {
+        const token = getOrCreateCsrfToken()
+        const stored = sessionStorageMock.getItem('csrf-token')
+        // Must not be JSON-wrapped (e.g. not "\"abc...\"" with extra quotes)
+        expect(stored).toBe(token)
+        expect(() => JSON.parse(stored!)).toThrow() // raw hex is not valid JSON
+      })
+    })
+
+    describe('Data isolation — no unintended sessionStorage side-effects', () => {
+      it('getOrCreateCsrfToken writes exactly one key to sessionStorage', () => {
+        const setItemSpy = vi.spyOn(sessionStorageMock, 'setItem')
+        getOrCreateCsrfToken()
+        expect(setItemSpy).toHaveBeenCalledTimes(1)
+        expect(setItemSpy).toHaveBeenCalledWith('csrf-token', expect.any(String))
+        setItemSpy.mockRestore()
+      })
+
+      it('getOrCreateCsrfToken on repeat calls writes no additional keys', () => {
+        getOrCreateCsrfToken() // first call — creates token
+        const setItemSpy = vi.spyOn(sessionStorageMock, 'setItem')
+        getOrCreateCsrfToken() // second call — should read, not write
+        getOrCreateCsrfToken() // third call — should read, not write
+        expect(setItemSpy).not.toHaveBeenCalled()
+        setItemSpy.mockRestore()
+      })
+
+      it('rotateCsrfToken writes exactly one key to sessionStorage', () => {
+        getOrCreateCsrfToken()
+        const setItemSpy = vi.spyOn(sessionStorageMock, 'setItem')
+        rotateCsrfToken()
+        expect(setItemSpy).toHaveBeenCalledTimes(1)
+        expect(setItemSpy).toHaveBeenCalledWith('csrf-token', expect.any(String))
+        setItemSpy.mockRestore()
+      })
+
+      it('clearCsrfToken removes exactly the csrf-token key, nothing else', () => {
+        sessionStorageMock.setItem('other-key', 'other-value')
+        getOrCreateCsrfToken()
+        const removeItemSpy = vi.spyOn(sessionStorageMock, 'removeItem')
+        clearCsrfToken()
+        expect(removeItemSpy).toHaveBeenCalledTimes(1)
+        expect(removeItemSpy).toHaveBeenCalledWith('csrf-token')
+        // Unrelated key must be untouched
+        expect(sessionStorageMock.getItem('other-key')).toBe('other-value')
+        removeItemSpy.mockRestore()
+      })
+
+      it('token value contains only lowercase hex characters — no PII or structured data', () => {
+        const token = generateCsrfToken()
+        // Strictly hex: any non-hex character would indicate embedded data
+        expect(token).toMatch(/^[0-9a-f]+$/)
+        // Must not contain common PII delimiters or structure
+        expect(token).not.toContain('@')
+        expect(token).not.toContain(':')
+        expect(token).not.toContain('{')
+        expect(token).not.toContain('}')
+        expect(token).not.toContain('.')
+      })
+
+      it('token length is exactly 64 characters (fixed, not variable)', () => {
+        for (let i = 0; i < 5; i++) {
+          expect(generateCsrfToken()).toHaveLength(64)
+        }
+      })
+
+      it('token stored in sessionStorage equals exactly the returned token — no extra data appended', () => {
+        const returned = getOrCreateCsrfToken()
+        const stored = sessionStorageMock.getItem('csrf-token')
+        expect(stored).toBe(returned)
+        expect(stored).toHaveLength(64)
+      })
+
+      it('after clearCsrfToken no csrf-related value remains readable', () => {
+        getOrCreateCsrfToken()
+        clearCsrfToken()
+        expect(sessionStorageMock.getItem('csrf-token')).toBeNull()
+        // Subsequent getOrCreateCsrfToken generates a fresh token, confirming old one is gone
+        const fresh = getOrCreateCsrfToken()
+        expect(fresh).toMatch(/^[0-9a-f]{64}$/)
+      })
+    })
   })
 })
