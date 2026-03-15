@@ -1,6 +1,65 @@
 /**
- * Security utilities for input validation and sanitization
+ * Security utilities for input validation, sanitization, and CSRF protection
  */
+
+const CSRF_TOKEN_KEY = 'csrf-token'
+const CSRF_TOKEN_BYTE_LENGTH = 32
+
+/**
+ * Generates a cryptographically random CSRF token
+ *
+ * @returns A hex-encoded random token string
+ */
+export function generateCsrfToken(): string {
+  const array = new Uint8Array(CSRF_TOKEN_BYTE_LENGTH)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Retrieves the CSRF token from sessionStorage, creating one if it doesn't exist.
+ * Returns an empty string in SSR contexts where sessionStorage is unavailable.
+ *
+ * @returns The CSRF token string, or empty string on the server
+ */
+export function getOrCreateCsrfToken(): string {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  let token = sessionStorage.getItem(CSRF_TOKEN_KEY)
+  if (!token) {
+    token = generateCsrfToken()
+    sessionStorage.setItem(CSRF_TOKEN_KEY, token)
+  }
+  return token
+}
+
+/**
+ * Rotates the CSRF token by generating a new one and storing it.
+ * Call this after a successful login or on session expiry.
+ *
+ * @returns The new CSRF token
+ */
+export function rotateCsrfToken(): string {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  const token = generateCsrfToken()
+  sessionStorage.setItem(CSRF_TOKEN_KEY, token)
+  return token
+}
+
+/**
+ * Clears the stored CSRF token. Call this on logout.
+ */
+export function clearCsrfToken(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+  sessionStorage.removeItem(CSRF_TOKEN_KEY)
+}
 
 /**
  * Validates that a URL is safe for use in HTML attributes
