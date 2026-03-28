@@ -706,7 +706,7 @@ const product = await prisma.product.findUnique({
 
 **Mitigations:**
 - ✅ SameSite cookies (Strict or Lax)
-- ⚠️ **TODO:** CSRF tokens for state-changing requests
+- ✅ CSRF tokens for state-changing requests (`X-CSRF-Token` header via `useCsrf` composable)
 - ✅ Verify Origin/Referer headers
 - ✅ Require re-authentication for sensitive actions
 

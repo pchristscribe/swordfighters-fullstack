@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
+import { getOrCreateCsrfToken, rotateCsrfToken, clearCsrfToken } from '~/utils/security'
 
 interface Admin {
   id: string
@@ -121,7 +122,8 @@ export const useAuthStore = defineStore('auth', {
         const optionsResponse = await $fetch(`${config.public.apiBase}/api/admin/webauthn/register/options`, {
           method: 'POST',
           body: { email: validatedEmail },
-          credentials: 'include'
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': getOrCreateCsrfToken() }
         }) as any
 
         console.log('✅ Registration options received:', optionsResponse)
@@ -136,6 +138,7 @@ export const useAuthStore = defineStore('auth', {
         const verificationResponse = await $fetch(`${config.public.apiBase}/api/admin/webauthn/register/verify`, {
           method: 'POST',
           credentials: 'include',
+          headers: { 'X-CSRF-Token': getOrCreateCsrfToken() },
           body: {
             email: validatedEmail,
             credential,
@@ -200,7 +203,8 @@ export const useAuthStore = defineStore('auth', {
         // Get authentication options from server
         const optionsResponse = await $fetch(`${config.public.apiBase}/api/admin/webauthn/authenticate/options`, {
           method: 'POST',
-          body: { email: validatedEmail }
+          body: { email: validatedEmail },
+          headers: { 'X-CSRF-Token': getOrCreateCsrfToken() }
         })
 
         console.log('✅ Authentication options received')
@@ -214,6 +218,7 @@ export const useAuthStore = defineStore('auth', {
         const verificationResponse = await $fetch(`${config.public.apiBase}/api/admin/webauthn/authenticate/verify`, {
           method: 'POST',
           credentials: 'include',
+          headers: { 'X-CSRF-Token': getOrCreateCsrfToken() },
           body: {
             email: validatedEmail,
             credential
@@ -223,6 +228,7 @@ export const useAuthStore = defineStore('auth', {
         if (verificationResponse.verified && verificationResponse.admin) {
           console.log('✅ Authentication successful')
           this.admin = verificationResponse.admin
+          rotateCsrfToken()
           return true
         }
         return false
@@ -276,12 +282,14 @@ export const useAuthStore = defineStore('auth', {
         const config = useRuntimeConfig()
         await $fetch(`${config.public.apiBase}/api/admin/auth/logout`, {
           method: 'POST',
-          credentials: 'include'
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': getOrCreateCsrfToken() }
         })
       } catch (err) {
         console.error('Logout error:', err)
       } finally {
         this.admin = null
+        clearCsrfToken()
       }
     }
   }

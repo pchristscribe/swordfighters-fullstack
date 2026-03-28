@@ -5,6 +5,17 @@
  * Ready to use in production with minimal configuration.
  */
 
+const { PrismaClient } = require('@prisma/client')
+
+// Singleton Prisma instance (reused across requests)
+let prisma
+function getPrisma() {
+  if (!prisma) {
+    prisma = new PrismaClient()
+  }
+  return prisma
+}
+
 /**
  * Authentication Middleware
  * Verifies user is authenticated via session
@@ -427,16 +438,21 @@ function parseSize(size) {
 }
 
 /**
- * Placeholder function - replace with actual DB query
+ * Fetch admin by ID from the database
  * @param {string} adminId - Admin ID
- * @returns {Promise<Object|null>} Admin object or null
+ * @returns {Promise<Object|null>} Admin object or null if not found
  */
 async function getAdminById(adminId) {
-  // TODO: Implement actual database query
-  // Example with Prisma:
-  // return await prisma.admin.findUnique({ where: { id: adminId } })
-  console.warn('getAdminById is not implemented - replace with actual DB query')
-  return null
+  return await getPrisma().admin.findUnique({
+    where: { id: adminId },
+    select: {
+      id: true,
+      isActive: true,
+      username: true,
+      createdAt: true,
+      updatedAt: true
+    }
+  })
 }
 
 // ============================================================================
