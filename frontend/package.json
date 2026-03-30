@@ -35,6 +35,7 @@
     "@vitejs/plugin-vue": "^6.0.2",
     "@vitest/ui": "^4.0.14",
     "@vue/test-utils": "^2.4.6",
+    "baseline-browser-mapping": "^2.10.12",
     "happy-dom": "^20.0.11",
     "vitest": "^4.0.14"
   }
