@@ -26,17 +26,17 @@ const handleClearAll = () => {
 </script>
 
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+  <div class="bg-surface dark:bg-surface-raised rounded-card shadow-card border border-gray-100 dark:border-gray-700">
     <!-- Header -->
-    <div class="px-6 py-4 border-b border-gray-200">
+    <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <h2 class="text-lg font-semibold text-gray-900">
+          <h2 class="text-lg font-semibold text-ink dark:text-ink-inverse">
             Filters
           </h2>
           <span
             v-if="filterStore.activeFiltersCount > 0"
-            class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+            class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-pill text-xs font-medium bg-brand-muted text-brand"
           >
             {{ filterStore.activeFiltersCount }} active
           </span>
@@ -45,7 +45,7 @@ const handleClearAll = () => {
           v-if="filterStore.hasActiveFilters"
           type="button"
           @click="handleClearAll"
-          class="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+          class="text-sm font-medium text-brand hover:text-brand-hover transition-colors duration-base"
         >
           Clear all
         </button>

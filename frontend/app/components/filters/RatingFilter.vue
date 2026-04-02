@@ -19,7 +19,7 @@ const renderStars = (count: number) => {
 
 <template>
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-2">
+    <label class="block text-sm font-medium text-ink-muted dark:text-ink-subtle mb-2">
       Minimum Rating
     </label>
     <div class="space-y-2">
@@ -28,11 +28,11 @@ const renderStars = (count: number) => {
         :key="option.value"
         type="button"
         @click="emit('update:modelValue', option.value)"
-        class="w-full px-4 py-2.5 text-left border rounded-lg transition-all"
+        class="w-full px-4 py-2.5 text-left border rounded-input transition-all duration-base"
         :class="
           modelValue === option.value
-            ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium'
-            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+            ? 'border-brand bg-brand-muted text-brand font-medium'
+            : 'border-steel text-ink-muted hover:border-ink-muted hover:bg-surface-light dark:border-gray-600 dark:text-ink-subtle dark:hover:bg-surface-raised'
         "
       >
         <div class="flex items-center justify-between">

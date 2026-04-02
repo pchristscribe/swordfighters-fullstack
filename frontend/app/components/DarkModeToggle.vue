@@ -1,7 +1,7 @@
 <template>
   <button
     @click="toggle"
-    class="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600"
+    class="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full shadow-raised flex items-center justify-center transition-all duration-slow ease-smooth hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand bg-surface dark:bg-surface-raised border border-gray-200 dark:border-gray-600"
     :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
     :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
   >
