@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useToast } from '~/composables/useToast'
+import AppToast from './AppToast.vue'
 
 const { toasts, dismiss } = useToast()
 </script>
@@ -16,7 +17,7 @@ const { toasts, dismiss } = useToast()
         tag="div"
         class="flex flex-col gap-2 items-stretch sm:items-end"
       >
-        <AppFeedbackToast
+        <AppToast
           v-for="toast in toasts"
           :key="toast.id"
           :toast="toast"

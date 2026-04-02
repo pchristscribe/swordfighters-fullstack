@@ -51,18 +51,7 @@ const showDiscountBadge = computed(() =>
           loading="lazy"
         />
 
-        <template v-if="variant === 'full'">
-          <!-- Affiliate Disclosure Badge -->
-          <div
-            class="absolute top-2 left-2 bg-accent text-ink text-xs font-semibold px-2 py-1 rounded-pill shadow-card"
-            title="This is an affiliate link. We may earn a commission from purchases."
-            role="note"
-            aria-label="Affiliate product"
-          >
-            Affiliate
-          </div>
-
-          <!-- Discount Badge -->
+          <!-- Discount Badge — shown in both variants -->
           <div
             v-if="showDiscountBadge"
             class="absolute top-2 right-2 bg-brand text-ink-inverse text-xs font-bold px-2 py-1 rounded-pill shadow-card"
@@ -70,7 +59,17 @@ const showDiscountBadge = computed(() =>
           >
             {{ discountPercentage }}% OFF
           </div>
-        </template>
+
+          <!-- Affiliate badge — full variant only -->
+          <div
+            v-if="variant === 'full'"
+            class="absolute top-2 left-2 bg-accent text-ink text-xs font-semibold px-2 py-1 rounded-pill shadow-card"
+            title="This is an affiliate link. We may earn a commission from purchases."
+            role="note"
+            aria-label="Affiliate product"
+          >
+            Affiliate
+          </div>
       </div>
 
       <!-- Product Details -->
