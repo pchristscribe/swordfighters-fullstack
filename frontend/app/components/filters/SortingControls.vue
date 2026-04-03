@@ -37,7 +37,7 @@ const toggleOrder = () => {
   <div class="flex items-center gap-3">
     <label
       for="sort-select"
-      class="text-sm font-medium text-gray-700 whitespace-nowrap"
+      class="text-sm font-medium text-ink-muted dark:text-ink-subtle whitespace-nowrap"
     >
       Sort by:
     </label>
@@ -47,7 +47,7 @@ const toggleOrder = () => {
         id="sort-select"
         :value="filterStore.sortBy"
         @change="handleSortChange"
-        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        class="border border-steel rounded-input px-3 py-2 text-sm bg-surface dark:bg-surface-dark text-ink dark:text-ink-inverse focus:ring-2 focus:ring-brand focus:border-transparent dark:border-gray-600 transition-colors duration-base"
       >
         <option
           v-for="option in sortOptions"
@@ -61,13 +61,13 @@ const toggleOrder = () => {
       <button
         type="button"
         @click="toggleOrder"
-        class="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        class="p-2 border border-steel rounded-input hover:bg-surface-light dark:hover:bg-surface-raised dark:border-gray-600 transition-colors duration-base"
         :title="filterStore.order === 'asc' ? 'Ascending' : 'Descending'"
       >
         <svg
           v-if="filterStore.order === 'asc'"
           xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5 text-gray-600"
+          class="h-5 w-5 text-ink-muted dark:text-ink-subtle"
           viewBox="0 0 20 20"
           fill="currentColor"
         >
@@ -76,7 +76,7 @@ const toggleOrder = () => {
         <svg
           v-else
           xmlns="http://www.w3.org/2000/svg"
-          class="h-5 w-5 text-gray-600"
+          class="h-5 w-5 text-ink-muted dark:text-ink-subtle"
           viewBox="0 0 20 20"
           fill="currentColor"
         >

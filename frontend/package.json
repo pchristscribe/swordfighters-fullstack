@@ -20,6 +20,7 @@
     "@eslint/markdown": "^7.5.1",
     "@nuxtjs/supabase": "^2.0.4",
     "@pinia/nuxt": "^0.11.3",
+    "@sentry/nuxt": "^10.47.0",
     "eslint": "^9.39.2",
     "eslint-plugin-vue": "^10.6.2",
     "globals": "^17.0.0",

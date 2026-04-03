@@ -30,46 +30,65 @@ const maxValue = computed({
   },
 })
 
-const minPercentage = computed(() => {
-  return ((props.min - PRICE_RANGE.min) / (PRICE_RANGE.max - PRICE_RANGE.min)) * 100
-})
+const minPercentage = computed(() =>
+  ((props.min - PRICE_RANGE.min) / (PRICE_RANGE.max - PRICE_RANGE.min)) * 100
+)
 
-const maxPercentage = computed(() => {
-  return ((props.max - PRICE_RANGE.min) / (PRICE_RANGE.max - PRICE_RANGE.min)) * 100
-})
+const maxPercentage = computed(() =>
+  ((props.max - PRICE_RANGE.min) / (PRICE_RANGE.max - PRICE_RANGE.min)) * 100
+)
 
-const formatPrice = (value: number): string => {
-  if (value >= PRICE_RANGE.max) return `$${value}+`
-  return `$${value}`
-}
+const formatPrice = (value: number): string =>
+  value >= PRICE_RANGE.max ? `$${value}+` : `$${value}`
+
+// Shared thumb styling used on both min and max range inputs
+const thumbClasses = [
+  '[&::-webkit-slider-thumb]:pointer-events-auto',
+  '[&::-webkit-slider-thumb]:appearance-none',
+  '[&::-webkit-slider-thumb]:w-5',
+  '[&::-webkit-slider-thumb]:h-5',
+  '[&::-webkit-slider-thumb]:rounded-full',
+  '[&::-webkit-slider-thumb]:bg-brand',
+  '[&::-webkit-slider-thumb]:cursor-pointer',
+  '[&::-webkit-slider-thumb]:border-2',
+  '[&::-webkit-slider-thumb]:border-white',
+  '[&::-webkit-slider-thumb]:shadow-card',
+  '[&::-moz-range-thumb]:pointer-events-auto',
+  '[&::-moz-range-thumb]:appearance-none',
+  '[&::-moz-range-thumb]:w-5',
+  '[&::-moz-range-thumb]:h-5',
+  '[&::-moz-range-thumb]:rounded-full',
+  '[&::-moz-range-thumb]:bg-brand',
+  '[&::-moz-range-thumb]:cursor-pointer',
+  '[&::-moz-range-thumb]:border-2',
+  '[&::-moz-range-thumb]:border-white',
+  '[&::-moz-range-thumb]:shadow-card',
+].join(' ')
 </script>
 
 <template>
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-2">
+    <label class="block text-sm font-medium text-ink-muted dark:text-ink-subtle mb-2">
       Price Range
     </label>
 
     <div class="space-y-4">
       <!-- Display selected range -->
-      <div class="flex items-center justify-between text-sm font-medium text-gray-900">
+      <div class="flex items-center justify-between text-sm font-medium text-ink dark:text-ink-inverse">
         <span>{{ formatPrice(min) }}</span>
-        <span class="text-gray-500">-</span>
+        <span class="text-ink-subtle">–</span>
         <span>{{ formatPrice(max) }}</span>
       </div>
 
       <!-- Dual range slider -->
       <div class="relative pt-2 pb-6">
-        <!-- Slider track background -->
-        <div class="absolute h-2 bg-gray-200 rounded-full w-full top-0" />
+        <!-- Track background -->
+        <div class="absolute h-2 bg-gray-200 dark:bg-gray-700 rounded-full w-full top-0" />
 
         <!-- Active range highlight -->
         <div
-          class="absolute h-2 bg-indigo-600 rounded-full top-0"
-          :style="{
-            left: `${minPercentage}%`,
-            right: `${100 - maxPercentage}%`,
-          }"
+          class="absolute h-2 bg-brand rounded-full top-0"
+          :style="{ left: `${minPercentage}%`, right: `${100 - maxPercentage}%` }"
         />
 
         <!-- Min slider -->
@@ -79,7 +98,8 @@ const formatPrice = (value: number): string => {
           :min="PRICE_RANGE.min"
           :max="PRICE_RANGE.max"
           :step="PRICE_RANGE.step"
-          class="absolute w-full h-2 bg-transparent appearance-none pointer-events-none top-0 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-indigo-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
+          :class="['absolute w-full h-2 bg-transparent appearance-none pointer-events-none top-0', thumbClasses]"
+          :aria-label="`Minimum price: $${min}`"
         >
 
         <!-- Max slider -->
@@ -89,43 +109,31 @@ const formatPrice = (value: number): string => {
           :min="PRICE_RANGE.min"
           :max="PRICE_RANGE.max"
           :step="PRICE_RANGE.step"
-          class="absolute w-full h-2 bg-transparent appearance-none pointer-events-none top-0 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-indigo-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
+          :class="['absolute w-full h-2 bg-transparent appearance-none pointer-events-none top-0', thumbClasses]"
+          :aria-label="`Maximum price: $${max}`"
         >
       </div>
 
       <!-- Quick price presets -->
       <div class="flex gap-2 flex-wrap">
         <button
+          v-for="[lo, hi, label] in [
+            [0, 20, 'Under $20'],
+            [20, 50, '$20 – $50'],
+            [50, 100, '$50 – $100'],
+            [100, 500, '$100+'],
+          ]"
+          :key="label"
           type="button"
-          @click="emit('update', 0, 20)"
-          class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          :class="{ 'bg-indigo-50 border-indigo-300 text-indigo-700': min === 0 && max === 20 }"
+          :class="[
+            'px-3 py-1.5 text-xs font-medium border rounded-input transition-colors duration-base',
+            min === lo && max === hi
+              ? 'bg-brand-muted border-brand text-brand'
+              : 'border-steel text-ink-muted hover:bg-surface-light dark:border-gray-600 dark:hover:bg-surface-raised',
+          ]"
+          @click="emit('update', lo as number, hi as number)"
         >
-          Under $20
-        </button>
-        <button
-          type="button"
-          @click="emit('update', 20, 50)"
-          class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          :class="{ 'bg-indigo-50 border-indigo-300 text-indigo-700': min === 20 && max === 50 }"
-        >
-          $20 - $50
-        </button>
-        <button
-          type="button"
-          @click="emit('update', 50, 100)"
-          class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          :class="{ 'bg-indigo-50 border-indigo-300 text-indigo-700': min === 50 && max === 100 }"
-        >
-          $50 - $100
-        </button>
-        <button
-          type="button"
-          @click="emit('update', 100, 500)"
-          class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-          :class="{ 'bg-indigo-50 border-indigo-300 text-indigo-700': min === 100 && max === 500 }"
-        >
-          $100+
+          {{ label }}
         </button>
       </div>
     </div>
