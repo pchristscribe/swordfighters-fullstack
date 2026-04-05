@@ -1,0 +1,9 @@
+{
+  "file_count": 52,
+  "hubs": [
+    {
+      "path": "app/types/index.ts",
+      "importers": 6
+    }
+  ]
+}
