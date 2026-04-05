@@ -1,0 +1,25 @@
+{
+  "file_count": 179,
+  "hubs": [
+    {
+      "path": "backend/src/app.js",
+      "importers": 6
+    },
+    {
+      "path": "frontend/app/types/index.ts",
+      "importers": 6
+    },
+    {
+      "path": "backend/src/lib/sentry.js",
+      "importers": 3
+    },
+    {
+      "path": "backend/src/middleware/adminAuth.js",
+      "importers": 3
+    },
+    {
+      "path": "backend/src/utils/cleanupExpiredChallenges.js",
+      "importers": 3
+    }
+  ]
+}

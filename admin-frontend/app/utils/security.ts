@@ -9,7 +9,8 @@ const CSRF_TOKEN_BYTE_LENGTH = 32
  * Generates a cryptographically random CSRF token
  *
  * @returns A hex-encoded random token string
- */
+ **/
+
 export function generateCsrfToken(): string {
   const array = new Uint8Array(CSRF_TOKEN_BYTE_LENGTH)
   crypto.getRandomValues(array)

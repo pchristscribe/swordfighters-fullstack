@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-04-05T18:11:06.862995-04:00",
+  "root": "/Users/pscribbler/ProjectXY",
+  "branch": "main",
+  "base_ref": "origin/main",
+  "prefix": {
+    "file_count": 179,
+    "hubs": [
+      {
+        "path": "backend/src/app.js",
+        "importers": 6
+      },
+      {
+        "path": "frontend/app/types/index.ts",
+        "importers": 6
+      },
+      {
+        "path": "backend/src/lib/sentry.js",
+        "importers": 3
+      },
+      {
+        "path": "backend/src/middleware/adminAuth.js",
+        "importers": 3
+      },
+      {
+        "path": "backend/src/utils/cleanupExpiredChallenges.js",
+        "importers": 3
+      }
+    ]
+  },
+  "delta": {
+    "changed": [
+      {
+        "path": "admin-frontend/app/utils/security.ts",
+        "hash": "928f7559f3c2745f8bf5b6e3762c6f7497bfe68199b14bb14f03dbcc6c9c5c2a",
+        "size": 3917,
+        "status": "modified"
+      },
+      {
+        "path": "backend/package-lock.json",
+        "hash": "4654517d947e7037e0fe5926db03a7047bf494aeee5f5bd66cb35b1b75fcb187",
+        "size": 260530,
+        "status": "modified"
+      },
+      {
+        "path": "backend/package.json",
+        "hash": "828c93445b516c70f5cc783e14285f32ef02a9b5ab32109f38989cee41d15111",
+        "size": 1480,
+        "status": "modified"
+      },
+      {
+        "path": "backend/src/routes/admin/.prettierrc",
+        "hash": "b90a2d062e9a3cb7c7e9cca9b74684c4e906456954909e2fc15d0a616b964993",
+        "size": 40,
+        "status": "untracked"
+      },
+      {
+        "path": "frontend/app/components/ProductFilters.vue",
+        "hash": "e2d36802f6fc54a7aa6fd03bcf019f3f4e9800d2b217dff785c67d0daab483ee",
+        "size": 150,
+        "status": "untracked"
+      },
+      {
+        "path": "frontend/app/components/SortingControls.vue",
+        "hash": "70e6bf71c18ce0f768c2ba5f8e89d4badb50d06693531ff274128ecbe9c99a7e",
+        "size": 170,
+        "status": "untracked"
+      },
+      {
+        "path": "frontend/app/stores/cart.ts",
+        "hash": "92b8db5498914eaee7a93fb33b86c482b31a1ad0b9a31caad1c633e393a47432",
+        "size": 1355,
+        "status": "modified"
+      },
+      {
+        "path": "frontend/nuxt.config.ts",
+        "hash": "b4a47a0732eef7ec238e25cd20fb4c28171d69f2c2c3e12d93949b378e46e833",
+        "size": 1304,
+        "status": "modified"
+      },
+      {
+        "path": "frontend/package-lock.json",
+        "hash": "6c21d5d4a92fdb2a6b5012f20f3cbdec1a4c7cf72d0e7172fc94c31fb4d58375",
+        "size": 543784,
+        "status": "modified"
+      },
+      {
+        "path": "frontend/package.json",
+        "hash": "3d3fe7c3a6f353476796b8cedae8397c8df0002365fa854110e444510e2e3c08",
+        "size": 1085,
+        "status": "modified"
+      },
+      {
+        "path": "frontend/tests/cart.test.ts",
+        "hash": "a20479e470168d8fcb4981328c77376f7d31c234207434cca0baace15613a8f3",
+        "size": 12629,
+        "status": "modified"
+      },
+      {
+        "path": "package-lock.json",
+        "hash": "51313c06849a76a784e4296034b588e1e0da2dbf1c924ed33f71281a8cdf4dfd",
+        "size": 47763,
+        "status": "untracked"
+      },
+      {
+        "path": "package.json",
+        "hash": "c81bd2764028c6cee84f950757329c431e26d3cc4af54be11352c2c0c9f455f1",
+        "size": 109,
+        "status": "modified"
+      }
+    ],
+    "risk_files": [],
+    "recent_events": [],
+    "next_steps": [
+      "Run tests covering changed files before handoff."
+    ],
+    "open_questions": [
+      "No recent timeline events matched the lookback window."
+    ]
+  },
+  "prefix_hash": "481637b215d0d894b05ab2f5b9f6611d71685567dbc7daa239f5a5b47285d895",
+  "delta_hash": "48105008e7fc8d42aa4f3489956ff7c6e8795266be0cfa45e142abbdc0d5197d",
+  "combined_hash": "1cee361eff363bfb94c2ef7a252cb6bb99a2fbbcdfa0d16d80c23b4e1c2b057c",
+  "metrics": {
+    "prefix_bytes": 307,
+    "delta_bytes": 2084,
+    "total_bytes": 2391,
+    "unchanged_bytes": 0,
+    "reuse_ratio": 0,
+    "prefix_reused": false,
+    "delta_reused": false,
+    "previous_combined_hash": "d3ec5e9ec471ec0beb50c2a15c222a6020bee2017f54164a90d1b1de2ae69dcd"
+  },
+  "agent_history": [
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T07:33:41.903665-04:00",
+      "ended_at": "2026-04-02T07:33:41.903665-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T21:54:19.241086-04:00",
+      "ended_at": "2026-04-02T21:54:19.241086-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T22:00:15.439074-04:00",
+      "ended_at": "2026-04-02T22:00:15.439074-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T22:00:16.122833-04:00",
+      "ended_at": "2026-04-02T22:00:16.122833-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T22:00:16.16675-04:00",
+      "ended_at": "2026-04-02T22:00:16.16675-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T22:01:53.567115-04:00",
+      "ended_at": "2026-04-02T22:01:53.567115-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-02T22:11:24.797706-04:00",
+      "ended_at": "2026-04-02T22:11:24.797706-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-03T01:57:52.1086-04:00",
+      "ended_at": "2026-04-03T01:57:52.1086-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-05T12:18:31.126758-04:00",
+      "ended_at": "2026-04-05T12:18:31.126758-04:00"
+    },
+    {
+      "agent_id": "claude-code",
+      "started_at": "2026-04-05T18:11:06.862996-04:00",
+      "ended_at": "2026-04-05T18:11:06.862996-04:00"
+    }
+  ],
+  "changed_files": [
+    "admin-frontend/app/utils/security.ts",
+    "backend/package-lock.json",
+    "backend/package.json",
+    "backend/src/routes/admin/.prettierrc",
+    "frontend/app/components/ProductFilters.vue",
+    "frontend/app/components/SortingControls.vue",
+    "frontend/app/stores/cart.ts",
+    "frontend/nuxt.config.ts",
+    "frontend/package-lock.json",
+    "frontend/package.json",
+    "frontend/tests/cart.test.ts",
+    "package-lock.json",
+    "package.json"
+  ],
+  "risk_files": [],
+  "recent_events": [],
+  "next_steps": [
+    "Run tests covering changed files before handoff."
+  ],
+  "open_questions": [
+    "No recent timeline events matched the lookback window."
+  ]
+}
