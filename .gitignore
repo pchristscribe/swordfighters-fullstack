@@ -36,6 +36,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+.cursor/
 *.swp
 *.swo
 *~
@@ -74,3 +75,8 @@ out/
 *.seed
 *.pid.lock
 .eslintcache
+
+# Root-level Bun exploration files
+/index.ts
+/tsconfig.json
+/bun.lock
