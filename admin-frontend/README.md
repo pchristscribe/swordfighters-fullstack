@@ -2,166 +2,197 @@
 
 WebAuthn-secured admin panel for managing the Swordfighters affiliate marketing platform.
 
-## Features
-
-- 🔐 **WebAuthn Authentication**: Passwordless login with hardware security keys (YubiKey, Touch ID, Face ID)
-- 🛡️ **Phishing-Resistant**: Cryptographic authentication bound to your domain
-- 📊 **Product Management**: CRUD operations for products, categories, and reviews
-- 🔒 **Session Security**: Redis-backed sessions with secure cookies
-- ✅ **Comprehensive Testing**: 30+ validation tests for authentication flows
-
 ## Tech Stack
 
-- **Framework**: Nuxt 4 (Vue 3 + SSR)
-- **Styling**: Tailwind CSS
+- **Framework**: Nuxt 4 (Vue 3 + SSR), `compatibilityDate: '2025-11-29'`
+- **Port**: 3002 (HMR: 24678)
+- **Styling**: Tailwind CSS (shared design system — Dosis font, brand colors)
 - **State Management**: Pinia
-- **Authentication**: @simplewebauthn/browser
+- **Authentication**: `@simplewebauthn/browser@^13` (WebAuthn passwordless)
+- **Data**: Supabase via `@nuxtjs/supabase`
+- **Monitoring**: Sentry (`@sentry/nuxt`)
 - **Testing**: Vitest + Vue Test Utils + happy-dom
+- **Security**: CSRF tokens, CSP headers, input sanitization
 
 ## Quick Start
 
 ### Prerequisites
 - Node.js 20+
-- PostgreSQL and Redis running (via `docker-compose up -d` from project root)
-- Backend API service running
+- PostgreSQL and Redis running: `docker-compose up -d` from project root
+- Backend API running on `http://localhost:3001`
 
 ### Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server on http://localhost:3002
-npm run dev
+npm run dev   # http://localhost:3002
 ```
 
-### First Time Setup
+### First-Time Setup
 
 1. Open http://localhost:3002
-2. Click "Register Security Key"
-3. Enter your email and device name
-4. Authenticate with your security key/biometric
-5. Login with your registered device
-
-## Testing
-
-Run the comprehensive test suite:
-
-```bash
-npm test              # Run all tests
-npm run test:watch    # Watch mode
-npm run test:ui       # Visual test UI
-npm run test:coverage # Coverage report
-```
-
-### Test Coverage
-
-- **30+ Tests**: Authentication flows, input validation, error handling
-- **95% Coverage**: All critical WebAuthn paths tested
-- **Security Testing**: Input sanitization, type coercion, SSR safety
-
-See [../TEST_COVERAGE_SUMMARY.md](../TEST_COVERAGE_SUMMARY.md) for detailed test metrics.
-
-## Supported Authenticators
-
-✅ **Hardware Security Keys**
-- YubiKey (5 Series, Security Key, Bio)
-- Google Titan Key
-- Any FIDO2-compliant security key
-
-✅ **Platform Authenticators**
-- macOS: Touch ID (Safari, Chrome, Edge)
-- iOS: Face ID / Touch ID (Safari)
-- Windows: Windows Hello (Chrome, Edge)
-- Android: Fingerprint / Face (Chrome)
+2. Click **"Register Security Key"**
+3. Enter your email and a device name
+4. Authenticate with your hardware key or biometric
+5. Login using your registered device
 
 ## Project Structure
 
 ```
 admin-frontend/
 ├── app/
-│   ├── components/        # Vue components
-│   ├── layouts/          # Nuxt layouts
-│   ├── pages/            # Route pages
-│   ├── stores/           # Pinia stores
-│   └── app.vue           # Root component
+│   ├── components/
+│   │   └── DarkModeToggle.vue         # Dark/light mode switcher
+│   │
+│   ├── composables/
+│   │   ├── useCsrf.ts                 # CSRF token — sent as X-CSRF-Token header
+│   │   ├── useDarkMode.ts             # Dark mode state + persistence
+│   │   └── useSupabaseAdmin.ts        # Supabase admin data utilities
+│   │
+│   ├── layouts/
+│   │   └── default.vue                # Shared layout with sidebar navigation
+│   │
+│   ├── middleware/
+│   │   └── auth.ts                    # Route guard — redirects to /login if unauthenticated
+│   │
+│   ├── pages/
+│   │   ├── index.vue                  # Dashboard
+│   │   ├── login.vue                  # WebAuthn login + device registration
+│   │   ├── products/index.vue         # Product management (CRUD + bulk ops)
+│   │   ├── categories.vue             # Category management (CRUD)
+│   │   ├── reviews.vue                # Review moderation (approve/reject)
+│   │   ├── diagnostic.vue             # System diagnostics
+│   │   └── test-webauthn.vue          # WebAuthn flow testing page
+│   │
+│   ├── stores/
+│   │   └── auth.ts                    # Pinia auth store (session, register, login, logout)
+│   │
+│   ├── types/
+│   │   ├── database.types.ts          # Supabase-generated DB types
+│   │   └── supabase.ts                # Supabase client types
+│   │
+│   └── utils/
+│       └── security.ts                # isValidHttpUrl, getSafeImageUrl, sanitizeText
+│
 ├── tests/
-│   └── auth.test.ts      # WebAuthn authentication tests
-├── nuxt.config.ts        # Nuxt configuration
-├── vitest.config.ts      # Test configuration
-└── package.json          # Dependencies and scripts
+│   ├── auth.test.ts                   # WebAuthn store tests (30+ tests)
+│   ├── darkMode.test.ts               # Dark mode composable tests
+│   └── security.test.ts               # Security utilities tests (70 tests)
+│
+├── nuxt.config.ts                     # Port, CSP headers, Supabase, runtime config
+├── tailwind.config.js                 # Brand colors, Dosis font, dark mode strategy
+├── vitest.config.ts                   # Vitest (happy-dom, v8 coverage, path aliases)
+├── sentry.client.config.ts
+└── sentry.server.config.ts
 ```
 
-## API Integration
-
-The admin panel communicates with the backend API for:
-- WebAuthn registration and authentication
-- Product, category, and review management
-- Session management
-
-Backend API must be running on the configured endpoint (default: http://localhost:3001).
-
-## Production Deployment
-
-### Environment Variables
+## Testing
 
 ```bash
-# Production configuration
-NODE_ENV=production
-NUXT_PUBLIC_API_URL=https://api.swordfighters.com
+npm test              # all tests
+npm run test:watch    # watch mode
+npm run test:ui       # Vitest visual UI
+npm run test:coverage # coverage report
+
+# specific files
+npx vitest tests/auth.test.ts
+npx vitest tests/security.test.ts
+npx vitest tests/darkMode.test.ts
 ```
 
-### Deployment
+**Test counts**:
+- `auth.test.ts` — 30+ tests (WebAuthn flows, validation, SSR safety)
+- `security.test.ts` — 70 tests (URL validation, safe image rendering, HTML sanitization)
+- `darkMode.test.ts` — toggle, persistence, SSR safety
 
-Deploy to Vercel (recommended):
+See [../TEST_COVERAGE_SUMMARY.md](../TEST_COVERAGE_SUMMARY.md) for full details.
+
+## Authentication Flow
+
+```
+User enters email
+    ↓
+auth store: registerSecurityKey(email, deviceName)
+    ↓
+POST /api/admin/webauthn/register/options  → challenge from backend
+    ↓
+@simplewebauthn/browser: startRegistration(challenge)
+    ↓
+Device signs challenge (Touch ID, YubiKey, etc.)
+    ↓
+POST /api/admin/webauthn/register/verify  → backend stores credential
+    ↓
+Session established, redirect to dashboard
+```
+
+Login flow mirrors registration but uses `/authenticate/options` and `/authenticate/verify`.
+
+## Security Features
+
+| Feature | Implementation |
+|---------|---------------|
+| WebAuthn auth | `@simplewebauthn/browser`, domain-bound credentials |
+| CSRF protection | `useCsrf` composable — `X-CSRF-Token` header on mutations |
+| CSP headers | `nuxt.config.ts` — blocks XSS, clickjacking, form hijacking |
+| URL validation | `utils/security.ts` — allows only `http:`/`https:` |
+| HTML sanitization | `utils/security.ts` — strips `<script>`, `<iframe>`, all tags |
+| Route guards | `middleware/auth.ts` — redirects unauthenticated users |
+| Session security | Redis-backed, HTTP-only cookies, 7-day expiry |
+
+## Supported Authenticators
+
+**Hardware Keys**: YubiKey (5 Series, Security Key, Bio), Google Titan Key, any FIDO2 key
+
+**Platform Authenticators**:
+- macOS: Touch ID (Chrome, Safari, Edge)
+- iOS/iPadOS: Face ID / Touch ID (Safari)
+- Windows: Windows Hello (Chrome, Edge)
+- Android: Fingerprint / Face (Chrome)
+
+## Admin Features
+
+| Page | Features |
+|------|---------|
+| `/products` | List, create, edit, delete, bulk status/delete, pagination, search |
+| `/categories` | List, create, edit, delete; auto-slug; SEO meta description |
+| `/reviews` | List, create, edit; approve/reject moderation; pros/cons lists |
+| `/diagnostic` | System health, API connectivity checks |
+| `/test-webauthn` | Manual WebAuthn flow testing |
+
+## Production Deployment
 
 ```bash
 npm run build
 vercel deploy
 ```
 
-See [../ADMIN_PANEL_SETUP.md](../ADMIN_PANEL_SETUP.md) for complete production deployment guide.
+Required environment variables:
+```bash
+NUXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NUXT_PUBLIC_SUPABASE_KEY=your-anon-key
+SUPABASE_SECRET_KEY=your-service-role-key
+API_BASE_URL=https://api.swordfighters.com
+NODE_ENV=production
+```
 
-## Security Features
-
-1. **WebAuthn Authentication**: Passwordless, phishing-resistant authentication
-2. **Public Key Cryptography**: Same security model as SSH/GPG keys
-3. **Replay Protection**: Signature counters prevent credential replay
-4. **Domain Binding**: Credentials only work on registered domain
-5. **Multiple Keys**: Register backup devices for redundancy
-
-## Known Issues
-
-See [../VALIDATION_BUGS_FOUND.md](../VALIDATION_BUGS_FOUND.md) for documented security vulnerabilities and planned fixes.
-
-## Documentation
-
-- **[ADMIN_PANEL_SETUP.md](../ADMIN_PANEL_SETUP.md)** - Complete setup and usage guide
-- **[TEST_COVERAGE_SUMMARY.md](../TEST_COVERAGE_SUMMARY.md)** - Test coverage metrics
-- **[VALIDATION_BUGS_FOUND.md](../VALIDATION_BUGS_FOUND.md)** - Security audit results
-- **[CLAUDE.md](../CLAUDE.md)** - Development guidelines
-
-## Resources
-
-- [WebAuthn Guide](https://webauthn.guide/)
-- [SimpleWebAuthn Documentation](https://simplewebauthn.dev/)
-- [Nuxt 4 Documentation](https://nuxt.com/docs)
-- [Vitest Documentation](https://vitest.dev/)
+See [../ADMIN_PANEL_SETUP.md](../ADMIN_PANEL_SETUP.md) for the full deployment checklist.
 
 ## Troubleshooting
 
-### "No security keys registered"
-You need to register a key first using the "Register Security Key" button.
+| Issue | Solution |
+|-------|----------|
+| "No security keys registered" | Register a key first from the login page |
+| "WebAuthn not supported" | Chrome 67+, Safari 13+, Edge 18+ required; HTTPS in production |
+| "Invalid session" | Clear cookies, verify Redis is running (`docker-compose ps`) |
+| Key not detected | YubiKey: insert & tap; Touch ID: enroll in System Preferences |
 
-### "WebAuthn not supported"
-- Update your browser (Chrome 67+, Safari 13+, Edge 18+)
-- HTTPS is required in production (localhost works in dev)
+## References
 
-### Security key not detected
-- **YubiKey**: Insert USB and tap the button
-- **Touch ID**: Ensure fingerprints are enrolled in System Preferences
-- **Windows Hello**: Enable in Windows Settings
-
----
-
-**🔐 Secured with military-grade cryptographic authentication**
+- [ADMIN_PANEL_SETUP.md](../ADMIN_PANEL_SETUP.md) — complete setup guide
+- [TEST_COVERAGE_SUMMARY.md](../TEST_COVERAGE_SUMMARY.md) — test metrics
+- [VALIDATION_BUGS_FOUND.md](../VALIDATION_BUGS_FOUND.md) — security audit results
+- [SECURITY_GUIDE.md](../SECURITY_GUIDE.md) — defense-in-depth architecture
+- [CLAUDE.md](../CLAUDE.md) — development guidelines
+- [SimpleWebAuthn Docs](https://simplewebauthn.dev/)
+- [Nuxt 4 Docs](https://nuxt.com/docs)
+- [WebAuthn Guide](https://webauthn.guide/)
