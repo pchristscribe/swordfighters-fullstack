@@ -75,3 +75,6 @@ out/
 *.pid.lock
 .eslintcache
 .codemap
+.codemap/
+codemap.php
+.codemapignore
