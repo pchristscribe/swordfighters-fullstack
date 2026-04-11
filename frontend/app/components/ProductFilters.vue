@@ -4,5 +4,7 @@ defineEmits(['apply'])
 </script>
 
 <template>
-  <!-- your filter UI here -->
+  <div>
+    <!-- filter UI -->
+  </div>
 </template>

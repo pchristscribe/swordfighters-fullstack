@@ -2,14 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useCartStore } from '../app/stores/cart'
 
-// Define CartItem interface for the test
-interface CartItem {
-  productId: string
-  title: string
-  price: number
-  quantity: number
-}
-
 // Mock useSupabaseProducts as a Nuxt auto-imported global composable
 const mockGetProduct = vi.fn()
 vi.stubGlobal('useSupabaseProducts', () => ({
@@ -136,7 +128,7 @@ describe('useCartStore', () => {
     it('should set loading to true while fetching product', async () => {
       const cart = useCartStore()
 
-      let resolvePromise: (value: any) => void
+      let resolvePromise: (value: unknown) => void
       const promise = new Promise((resolve) => {
         resolvePromise = resolve
       })
@@ -408,7 +400,7 @@ describe('useCartStore', () => {
 
       try {
         await cart.addItem('product-1')
-      } catch (error) {
+      } catch {
         // Expected to throw
       }
 

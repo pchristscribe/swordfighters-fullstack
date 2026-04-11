@@ -109,7 +109,7 @@ watch(() => route.query, (newQuery) => {
 
         <!-- Pagination -->
         <div v-if="productStore.pagination && !productStore.loading">
-          <Pagination
+          <AppPagination
             :pagination="productStore.pagination"
             @change="handlePageChange"
           />

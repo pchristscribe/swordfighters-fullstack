@@ -115,7 +115,7 @@ export const useSupabaseProducts = () => {
 
     const product = mapDbProduct(data)
     if (data.affiliate_links) {
-      product.affiliateLinks = (data.affiliate_links as any[]).map((link) => ({
+      product.affiliateLinks = (data.affiliate_links as Record<string, unknown>[]).map((link) => ({
         id: link.id,
         productId: link.product_id,
         originalUrl: link.original_url,
@@ -144,7 +144,7 @@ export const useSupabaseProducts = () => {
     return (data ?? []).map((row) => ({
       ...mapDbCategory(row),
       _count: {
-        products: (row as any).products?.[0]?.count ?? 0,
+        products: (row as Record<string, Array<{ count: number }>>).products?.[0]?.count ?? 0,
       },
     }))
   }

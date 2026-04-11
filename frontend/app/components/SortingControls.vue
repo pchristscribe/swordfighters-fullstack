@@ -5,5 +5,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <!-- your sort UI here -->
+  <div>
+    <!-- sort UI -->
+  </div>
 </template>
