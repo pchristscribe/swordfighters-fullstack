@@ -10,21 +10,18 @@ interface CartItem {
   quantity: number
 }
 
-// Mock the fetchProduct API call
-const mockFetchProduct = vi.fn()
-vi.mock('../app/composables/useApi', () => ({
-  fetchProduct: (productId: string) => mockFetchProduct(productId),
+// Mock useSupabaseProducts as a Nuxt auto-imported global composable
+const mockGetProduct = vi.fn()
+vi.stubGlobal('useSupabaseProducts', () => ({
+  getProduct: mockGetProduct,
 }))
-
-// Make fetchProduct available globally for the store
-global.fetchProduct = mockFetchProduct
 
 describe('useCartStore', () => {
   beforeEach(() => {
     // Create a fresh Pinia instance before each test
     setActivePinia(createPinia())
     // Reset mock
-    mockFetchProduct.mockReset()
+    mockGetProduct.mockReset()
   })
 
   describe('Initial State', () => {
@@ -89,7 +86,7 @@ describe('useCartStore', () => {
     it('should add a new item to the cart', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Test Product',
         price: 29.99,
       })
@@ -103,14 +100,14 @@ describe('useCartStore', () => {
         price: 29.99,
         quantity: 2,
       })
-      expect(mockFetchProduct).toHaveBeenCalledWith('product-1')
-      expect(mockFetchProduct).toHaveBeenCalledTimes(1)
+      expect(mockGetProduct).toHaveBeenCalledWith('product-1')
+      expect(mockGetProduct).toHaveBeenCalledTimes(1)
     })
 
     it('should default quantity to 1 when not provided', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Test Product',
         price: 29.99,
       })
@@ -133,7 +130,7 @@ describe('useCartStore', () => {
 
       expect(cart.items).toHaveLength(1)
       expect(cart.items[0].quantity).toBe(5) // 2 + 3
-      expect(mockFetchProduct).not.toHaveBeenCalled() // Should not fetch for existing item
+      expect(mockGetProduct).not.toHaveBeenCalled() // Should not fetch for existing item
     })
 
     it('should set loading to true while fetching product', async () => {
@@ -144,7 +141,7 @@ describe('useCartStore', () => {
         resolvePromise = resolve
       })
 
-      mockFetchProduct.mockReturnValue(promise)
+      mockGetProduct.mockReturnValue(promise)
 
       const addPromise = cart.addItem('product-1')
 
@@ -159,7 +156,7 @@ describe('useCartStore', () => {
     it('should add multiple different products', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct
+      mockGetProduct
         .mockResolvedValueOnce({ title: 'Product 1', price: 10 })
         .mockResolvedValueOnce({ title: 'Product 2', price: 20 })
 
@@ -169,13 +166,13 @@ describe('useCartStore', () => {
       expect(cart.items).toHaveLength(2)
       expect(cart.items[0].productId).toBe('product-1')
       expect(cart.items[1].productId).toBe('product-2')
-      expect(mockFetchProduct).toHaveBeenCalledTimes(2)
+      expect(mockGetProduct).toHaveBeenCalledTimes(2)
     })
 
     it('should handle zero quantity addition', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Test Product',
         price: 29.99,
       })
@@ -188,7 +185,7 @@ describe('useCartStore', () => {
     it('should handle negative quantity addition', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Test Product',
         price: 29.99,
       })
@@ -201,7 +198,7 @@ describe('useCartStore', () => {
     it('should handle API errors gracefully', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockRejectedValue(new Error('API Error'))
+      mockGetProduct.mockRejectedValue(new Error('API Error'))
 
       await expect(cart.addItem('product-1')).rejects.toThrow('API Error')
 
@@ -298,7 +295,7 @@ describe('useCartStore', () => {
     it('should handle product with zero price', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Free Product',
         price: 0,
       })
@@ -312,7 +309,7 @@ describe('useCartStore', () => {
     it('should handle very large quantities', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Bulk Product',
         price: 1,
       })
@@ -326,7 +323,7 @@ describe('useCartStore', () => {
     it('should handle very high prices', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Expensive Product',
         price: 9999999.99,
       })
@@ -339,7 +336,7 @@ describe('useCartStore', () => {
     it('should handle empty product ID', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Test Product',
         price: 10,
       })
@@ -352,7 +349,7 @@ describe('useCartStore', () => {
     it('should handle concurrent addItem calls', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct
+      mockGetProduct
         .mockResolvedValueOnce({ title: 'Product 1', price: 10 })
         .mockResolvedValueOnce({ title: 'Product 2', price: 20 })
         .mockResolvedValueOnce({ title: 'Product 3', price: 30 })
@@ -370,7 +367,7 @@ describe('useCartStore', () => {
     it('should handle adding then removing the same item', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockResolvedValue({
+      mockGetProduct.mockResolvedValue({
         title: 'Test Product',
         price: 29.99,
       })
@@ -387,7 +384,7 @@ describe('useCartStore', () => {
     it('should maintain cart state across multiple operations', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct
+      mockGetProduct
         .mockResolvedValueOnce({ title: 'Product 1', price: 10 })
         .mockResolvedValueOnce({ title: 'Product 2', price: 20 })
         .mockResolvedValueOnce({ title: 'Product 1', price: 10 })
@@ -407,7 +404,7 @@ describe('useCartStore', () => {
     it('should set loading to false even if fetch fails', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct.mockRejectedValue(new Error('Network error'))
+      mockGetProduct.mockRejectedValue(new Error('Network error'))
 
       try {
         await cart.addItem('product-1')
@@ -423,7 +420,7 @@ describe('useCartStore', () => {
 
       const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-      mockFetchProduct.mockImplementation(async () => {
+      mockGetProduct.mockImplementation(async () => {
         await delay(100)
         return { title: 'Slow Product', price: 15 }
       })
@@ -440,7 +437,7 @@ describe('useCartStore', () => {
     it('should handle multiple sequential addItem calls correctly', async () => {
       const cart = useCartStore()
 
-      mockFetchProduct
+      mockGetProduct
         .mockResolvedValueOnce({ title: 'Product 1', price: 10 })
         .mockResolvedValueOnce({ title: 'Product 2', price: 20 })
 

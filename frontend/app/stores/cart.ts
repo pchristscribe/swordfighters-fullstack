@@ -25,7 +25,8 @@ export const useCartStore = defineStore('cart', () => {
     } else {
       loading.value = true
       try {
-        const product = await fetchProduct(productId)
+        const supabaseProducts = useSupabaseProducts()
+        const product = await supabaseProducts.getProduct(productId)
         items.value.push({
           productId,
           title: product.title,
