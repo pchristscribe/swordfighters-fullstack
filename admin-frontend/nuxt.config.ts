@@ -14,6 +14,7 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@nuxtjs/tailwindcss',
     '@nuxtjs/supabase',
+    '@nuxtjs/mcp-toolkit',
   ],
 
   supabase: {
