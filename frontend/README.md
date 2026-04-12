@@ -63,9 +63,8 @@ frontend/
 │   │
 │   ├── composables/
 │   │   ├── useDarkMode.ts            # Dark/light mode state + persistence
-│   │   ├── useApi.ts                 # API communication wrapper
 │   │   ├── useToast.ts               # Toast notification system
-│   │   └── useSupabaseProducts.ts    # Supabase product data fetching
+│   │   └── useSupabaseProducts.ts    # Supabase product data fetching (primary data layer)
 │   │
 │   ├── layouts/
 │   │   └── default.vue               # Shared layout (nav, footer)

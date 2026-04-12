@@ -37,8 +37,8 @@ const dropdownRef = ref<HTMLElement | null>(null)
 // Debounce timer
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-// API composable
-const api = useApi()
+// Data access — Supabase-direct (see composables/useSupabaseProducts.ts)
+const api = useSupabaseProducts()
 
 // Computed
 const showDropdown = computed(() => {
@@ -65,11 +65,7 @@ const performSearch = async (query: string) => {
   error.value = null
 
   try {
-    // Search products by title (assuming API supports search param)
-    const response = await api.getProducts({
-      search: query,
-      limit: props.maxResults,
-    })
+    const response = await api.searchProducts(query, { limit: props.maxResults })
     results.value = response.products
     isOpen.value = true
     emit('search', query)
