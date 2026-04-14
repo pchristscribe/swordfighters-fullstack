@@ -1,15 +1,89 @@
 <script setup lang="ts">
 const route = useRoute()
 const productStore = useProductStore()
+const { public: { siteUrl } } = useRuntimeConfig()
 
 const productId = route.params.id as string
 
-// Fetch product details
-onMounted(() => {
-  productStore.fetchProduct(productId)
-})
+// Fetch on the server so crawlers see fully-rendered meta/JSON-LD.
+await productStore.fetchProduct(productId)
 
 const product = computed(() => productStore?.currentProduct)
+
+// ---- SEO meta (title/description/OG/Twitter) ----------------------------
+useSeoMeta({
+  title: () => product.value ? product.value.title : 'Product',
+  description: () =>
+    product.value
+      ? (product.value.description?.slice(0, 200) || `${product.value.title} on Swordfighters.`)
+      : 'Swordfighters curated product.',
+  ogTitle: () => product.value?.title ?? 'Swordfighters',
+  ogDescription: () =>
+    product.value?.description?.slice(0, 200)
+    ?? 'Curated product for gay men on Swordfighters.',
+  ogImage: () => product.value?.imageUrl ?? undefined,
+  ogType: 'website',
+  ogUrl: () => `${siteUrl}/products/${productId}`,
+  twitterCard: 'summary_large_image',
+  twitterImage: () => product.value?.imageUrl ?? undefined,
+})
+
+// ---- JSON-LD Product structured data ------------------------------------
+// Google uses this to render rich product cards in search results.
+const jsonLd = computed(() => {
+  const p = product.value
+  if (!p) return null
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: p.title,
+    description: p.description,
+    image: p.imageUrl,
+    sku: p.externalId,
+    brand: { '@type': 'Brand', name: p.platform },
+    category: p.category?.name,
+    offers: {
+      '@type': 'Offer',
+      url: `${siteUrl}/products/${p.id}`,
+      priceCurrency: p.currency,
+      price: p.price,
+      availability: p.status === 'ACTIVE'
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+    },
+    ...(p.rating ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: p.rating,
+        reviewCount: p.reviewCount || 1,
+      },
+    } : {}),
+    ...(p.reviews && p.reviews.length > 0 ? {
+      review: p.reviews.map((r) => ({
+        '@type': 'Review',
+        author: { '@type': 'Organization', name: r.authorName },
+        datePublished: r.createdAt,
+        reviewBody: r.content,
+        name: r.title,
+        reviewRating: {
+          '@type': 'Rating',
+          ratingValue: r.rating,
+          bestRating: 5,
+          worstRating: 1,
+        },
+      })),
+    } : {}),
+  }
+})
+
+useHead({
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: computed(() => jsonLd.value ? JSON.stringify(jsonLd.value) : ''),
+    },
+  ],
+})
 
 // Handle affiliate link click
 const handleAffiliateClick = (url: string) => {
