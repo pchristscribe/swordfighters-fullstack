@@ -1,5 +1,5 @@
 import type { Database } from '~/types/supabase'
-import type { Product, Category, Pagination, ProductFilters } from '~/types'
+import type { Product, Category, Pagination, ProductFilters, Review } from '~/types'
 
 type DbProduct = Database['public']['Tables']['products']['Row']
 type DbCategory = Database['public']['Tables']['categories']['Row']
@@ -106,7 +106,7 @@ export const useSupabaseProducts = () => {
   const getProduct = async (id: string): Promise<Product> => {
     const { data, error } = await supabase
       .from('products')
-      .select('*, categories(*), affiliate_links(*)')
+      .select('*, categories(*), affiliate_links(*), reviews(*)')
       .eq('id', id)
       .single()
 
@@ -128,6 +128,27 @@ export const useSupabaseProducts = () => {
         createdAt: link.created_at,
         updatedAt: link.updated_at,
       }))
+    }
+    if ((data as any).reviews) {
+      // Featured reviews first, then by most recent.
+      product.reviews = ((data as any).reviews as any[])
+        .map((row): Review => ({
+          id: row.id,
+          productId: row.product_id,
+          rating: row.rating,
+          title: row.title ?? undefined,
+          content: row.content,
+          pros: row.pros ?? [],
+          cons: row.cons ?? [],
+          authorName: row.author_name,
+          isFeatured: row.is_featured,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        }))
+        .sort((a, b) => {
+          if (a.isFeatured !== b.isFeatured) return a.isFeatured ? -1 : 1
+          return b.createdAt.localeCompare(a.createdAt)
+        })
     }
 
     return product
