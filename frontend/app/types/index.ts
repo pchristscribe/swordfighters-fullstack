@@ -72,6 +72,7 @@ export interface ProductFilters {
   minPrice?: number
   maxPrice?: number
   minRating?: number
+  tag?: string
   page?: number
   limit?: number
   sortBy?: string

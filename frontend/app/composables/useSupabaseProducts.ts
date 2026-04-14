@@ -78,6 +78,10 @@ export const useSupabaseProducts = () => {
       query = query.gte('rating', filters.minRating)
     }
 
+    if (filters.tag) {
+      query = query.contains('tags', [filters.tag])
+    }
+
     const sortColumn = filters.sortBy === 'createdAt' ? 'created_at'
       : filters.sortBy === 'price' ? 'price'
       : filters.sortBy === 'rating' ? 'rating'

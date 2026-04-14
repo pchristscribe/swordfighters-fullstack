@@ -21,6 +21,9 @@
             <NuxtLink to="/categories" class="text-ink dark:text-ink-muted hover:text-brand dark:hover:text-brand-hover transition-colors duration-base">
               Categories
             </NuxtLink>
+            <NuxtLink :to="`/seasonal/${currentSeason.slug}`" class="text-ink dark:text-ink-muted hover:text-brand dark:hover:text-brand-hover transition-colors duration-base">
+              {{ currentSeason.label }}
+            </NuxtLink>
           </nav>
         </div>
         <!-- Mobile search row -->
@@ -65,11 +68,15 @@
 
 <script setup lang="ts">
 import type { Product } from '~/types'
+import { getCurrentSeason } from '~/utils/seasons'
 
 const { init } = useDarkMode()
 onMounted(() => {
   init()
 })
+
+// Current seasonal collection shown in the header (pride in June, etc.).
+const currentSeason = getCurrentSeason()
 
 // Navigate to the product detail page when a search result is chosen.
 const handleSearchSelect = (product: Product) => {
