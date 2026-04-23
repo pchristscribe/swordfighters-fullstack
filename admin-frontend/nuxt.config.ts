@@ -15,6 +15,7 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@nuxtjs/supabase',
     '@sentry/nuxt/module',
+    '@nuxt/eslint',
   ],
 
   supabase: {

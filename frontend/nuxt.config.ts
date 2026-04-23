@@ -7,7 +7,7 @@ export default defineNuxtConfig({
     port: 3000,
   },
 
-  modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt', 'nuxt-headlessui', '@nuxtjs/supabase', '@sentry/nuxt/module'],
+  modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt', 'nuxt-headlessui', '@nuxtjs/supabase', '@sentry/nuxt/module', '@nuxt/eslint'],
 
   // Optionally change the default prefix.
   headlessui: {
