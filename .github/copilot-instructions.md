@@ -216,6 +216,6 @@ docker exec -it swordfighters-postgres psql -U swordfighters -d swordfighters_db
 
 - Set `SESSION_SECRET` to 64+ character random string
 - Set `RP_ID` = your domain (required for WebAuthn)
-- Frontend deploys to Vercel, backend to Railway/Render
+- All services (both frontends and backend) deploy to Railway (see `RAILWAY.md`)
 - Database: Supabase (PostgreSQL)
 - Ensure HTTPS in production (WebAuthn requirement)

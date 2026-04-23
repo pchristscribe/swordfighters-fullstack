@@ -56,7 +56,7 @@ swordfighters-fullstack/
 
 ### Infrastructure
 - Docker Compose: PostgreSQL 16 (`swordfighters-postgres`) + Redis 7 (`swordfighters-redis`)
-- Production: Vercel (frontends), Railway/Render (backend), Supabase (DB), Sentry (monitoring)
+- Production: Railway (frontends + backend), Supabase (DB), Sentry (monitoring)
 - CI/CD: GitHub Actions (`main.yml`, `claude.yml`, `claude-code-review.yml`, `eslint.yml`)
 
 ## Directory Deep-Dive

@@ -161,10 +161,7 @@ Login flow mirrors registration but uses `/authenticate/options` and `/authentic
 
 ## Production Deployment
 
-```bash
-npm run build
-vercel deploy
-```
+Deployed to Railway. See [../RAILWAY.md](../RAILWAY.md) for setup. The repo's `railway.json` in this directory defines the build and start commands; Railway picks them up when the service's **Root Directory** is set to `admin-frontend/`.
 
 Required environment variables:
 ```bash

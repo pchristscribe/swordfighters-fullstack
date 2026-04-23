@@ -285,19 +285,15 @@ NODE_ENV=production
 - [ ] Set correct `RP_ID` to match your production domain
 - [ ] Set `ADMIN_URL` to your admin subdomain (HTTPS required)
 - [ ] Set all Supabase credentials
-- [ ] Deploy backend to Railway/Render
-- [ ] Deploy admin frontend to Vercel
+- [ ] Deploy backend to Railway
+- [ ] Deploy admin frontend to Railway
 - [ ] Configure CORS to allow your admin domain
 - [ ] Test WebAuthn registration on production domain
 - [ ] Register at least 2 security keys (primary + backup)
 
-### Vercel Deployment
+### Railway Deployment
 
-```bash
-cd admin-frontend
-npm run build   # verify build succeeds locally first
-vercel deploy   # deploy to Vercel
-```
+See [RAILWAY.md](./RAILWAY.md) for the full per-service deployment guide. In short, create a Railway service pointing at this repo with **Root Directory** set to `admin-frontend/`; the included `railway.json` handles build and start.
 
 ## Managing Security Keys
 
