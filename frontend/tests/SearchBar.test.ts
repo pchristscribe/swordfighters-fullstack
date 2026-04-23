@@ -3,14 +3,14 @@ import { mount, flushPromises } from '@vue/test-utils'
 import SearchBar from '../app/components/SearchBar.vue'
 import type { Product } from '../app/types'
 
-// Mock the useApi composable
-const mockGetProducts = vi.fn()
-const mockUseApi = vi.fn(() => ({
-  getProducts: mockGetProducts,
+// Mock the useSupabaseProducts composable
+const mockSearchProducts = vi.fn()
+const mockUseSupabaseProducts = vi.fn(() => ({
+  searchProducts: mockSearchProducts,
 }))
 
 // Set up global mock
-vi.stubGlobal('useApi', mockUseApi)
+vi.stubGlobal('useSupabaseProducts', mockUseSupabaseProducts)
 
 // Mock product data
 const mockProducts: Product[] = [
@@ -106,11 +106,11 @@ describe('SearchBar Component', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      expect(mockGetProducts).not.toHaveBeenCalled()
+      expect(mockSearchProducts).not.toHaveBeenCalled()
     })
 
     it('searches when query meets minimum characters', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -127,14 +127,11 @@ describe('SearchBar Component', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      expect(mockGetProducts).toHaveBeenCalledWith({
-        search: 'pride',
-        limit: 10,
-      })
+      expect(mockSearchProducts).toHaveBeenCalledWith('pride', { limit: 10 })
     })
 
     it('debounces search requests', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -154,17 +151,17 @@ describe('SearchBar Component', () => {
       await vi.advanceTimersByTimeAsync(100)
 
       // Should not have called API yet
-      expect(mockGetProducts).not.toHaveBeenCalled()
+      expect(mockSearchProducts).not.toHaveBeenCalled()
 
       await vi.advanceTimersByTimeAsync(300)
       await flushPromises()
 
       // Should have called API only once
-      expect(mockGetProducts).toHaveBeenCalledTimes(1)
+      expect(mockSearchProducts).toHaveBeenCalledTimes(1)
     })
 
     it('respects maxResults prop', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 5, total: 2, pages: 1 },
       })
@@ -180,14 +177,11 @@ describe('SearchBar Component', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      expect(mockGetProducts).toHaveBeenCalledWith({
-        search: 'pride',
-        limit: 5,
-      })
+      expect(mockSearchProducts).toHaveBeenCalledWith('pride', { limit: 5 })
     })
 
     it('emits search event when search is performed', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -205,7 +199,7 @@ describe('SearchBar Component', () => {
 
   describe('Results Display', () => {
     it('shows dropdown with results after successful search', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -225,7 +219,7 @@ describe('SearchBar Component', () => {
     })
 
     it('displays product information correctly', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: [mockProducts[0]],
         pagination: { page: 1, limit: 10, total: 1, pages: 1 },
       })
@@ -245,7 +239,7 @@ describe('SearchBar Component', () => {
     })
 
     it('shows no results message when search returns empty', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: [],
         pagination: { page: 1, limit: 10, total: 0, pages: 0 },
       })
@@ -265,7 +259,7 @@ describe('SearchBar Component', () => {
       const delayedPromise = new Promise((resolve) => {
         resolvePromise = resolve
       })
-      mockGetProducts.mockReturnValue(delayedPromise)
+      mockSearchProducts.mockReturnValue(delayedPromise)
 
       const wrapper = mount(SearchBar)
       const input = wrapper.find('input[type="text"]')
@@ -287,7 +281,7 @@ describe('SearchBar Component', () => {
     })
 
     it('shows error message when search fails', async () => {
-      mockGetProducts.mockRejectedValue(new Error('Network error'))
+      mockSearchProducts.mockRejectedValue(new Error('Network error'))
 
       const wrapper = mount(SearchBar)
       const input = wrapper.find('input[type="text"]')
@@ -309,7 +303,7 @@ describe('SearchBar Component', () => {
 
   describe('Keyboard Navigation', () => {
     it('navigates down with arrow key', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -329,7 +323,7 @@ describe('SearchBar Component', () => {
     })
 
     it('navigates up with arrow key', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -355,7 +349,7 @@ describe('SearchBar Component', () => {
     })
 
     it('selects product with Enter key', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -376,7 +370,7 @@ describe('SearchBar Component', () => {
     })
 
     it('closes dropdown with Escape key', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -397,7 +391,7 @@ describe('SearchBar Component', () => {
     })
 
     it('does not navigate beyond list boundaries', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -429,7 +423,7 @@ describe('SearchBar Component', () => {
 
   describe('User Interactions', () => {
     it('selects product on click', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -489,7 +483,7 @@ describe('SearchBar Component', () => {
     })
 
     it('updates aria-expanded when dropdown opens', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -505,7 +499,7 @@ describe('SearchBar Component', () => {
     })
 
     it('has proper role attributes on dropdown and items', async () => {
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: mockProducts,
         pagination: { page: 1, limit: 10, total: 2, pages: 1 },
       })
@@ -536,13 +530,13 @@ describe('SearchBar Component', () => {
       await vi.runAllTimersAsync()
       await flushPromises()
 
-      expect(mockGetProducts).not.toHaveBeenCalled()
+      expect(mockSearchProducts).not.toHaveBeenCalled()
       expect(wrapper.find('#search-results').exists()).toBe(false)
     })
 
     it('handles products without images', async () => {
       const productWithoutImage = { ...mockProducts[0], imageUrl: '' }
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: [productWithoutImage],
         pagination: { page: 1, limit: 10, total: 1, pages: 1 },
       })
@@ -560,7 +554,7 @@ describe('SearchBar Component', () => {
 
     it('handles products without ratings', async () => {
       const productWithoutRating = { ...mockProducts[0], rating: undefined }
-      mockGetProducts.mockResolvedValue({
+      mockSearchProducts.mockResolvedValue({
         products: [productWithoutRating],
         pagination: { page: 1, limit: 10, total: 1, pages: 1 },
       })
