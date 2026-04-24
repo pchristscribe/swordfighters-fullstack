@@ -138,7 +138,6 @@ frontend/
 │   │   └── search-demo.vue           # Search demonstration
 │   ├── stores/
 │   │   ├── filters.ts   # Filter state (category, platform, price, rating, sort)
-│   │   ├── cart.ts      # Shopping cart
 │   │   └── products.ts  # Product catalog
 │   └── types/
 │       ├── index.ts
@@ -149,7 +148,6 @@ frontend/
 │   ├── ProductCard.test.ts
 │   ├── ProductCardSimple.test.ts
 │   ├── SearchBar.test.ts
-│   ├── cart.test.ts
 │   ├── darkMode.test.ts
 │   ├── filters.test.ts
 │   ├── stores.test.ts
@@ -244,7 +242,6 @@ docker-compose down -v        # Remove volumes (⚠️ deletes all data)
 |------|-------------|
 | `admin-frontend/tests/auth.test.ts` | WebAuthn auth validation (30+ tests) |
 | `admin-frontend/tests/security.test.ts` | Input sanitization, XSS, CSRF |
-| `frontend/tests/cart.test.ts` | Cart store operations |
 | `frontend/tests/filters.test.ts` | Filter store and UI |
 | `frontend/tests/SearchBar.test.ts` | Search component (17.9 KB) |
 | `frontend/tests/ProductCard.test.ts` | Product card component |
@@ -292,7 +289,6 @@ Both frontends share an identical Tailwind config with:
 | Store | File | Purpose |
 |-------|------|---------|
 | `filters` | `stores/filters.ts` | Category, platform, price range, rating, sort |
-| `cart` | `stores/cart.ts` | Cart items and totals |
 | `products` | `stores/products.ts` | Product catalog data |
 
 **Filter store** maps to URL query params via `toQueryParams()` and `initFromQuery()`. Price range: 0–500. Sort: `createdAt` (default), `desc` (default order).

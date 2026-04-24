@@ -1,15 +1,89 @@
 <script setup lang="ts">
 const route = useRoute()
 const productStore = useProductStore()
+const { public: { siteUrl } } = useRuntimeConfig()
 
 const productId = route.params.id as string
 
-// Fetch product details
-onMounted(() => {
-  productStore.fetchProduct(productId)
-})
+// Fetch on the server so crawlers see fully-rendered meta/JSON-LD.
+await productStore.fetchProduct(productId)
 
 const product = computed(() => productStore?.currentProduct)
+
+// ---- SEO meta (title/description/OG/Twitter) ----------------------------
+useSeoMeta({
+  title: () => product.value ? product.value.title : 'Product',
+  description: () =>
+    product.value
+      ? (product.value.description?.slice(0, 200) || `${product.value.title} on Swordfighters.`)
+      : 'Swordfighters curated product.',
+  ogTitle: () => product.value?.title ?? 'Swordfighters',
+  ogDescription: () =>
+    product.value?.description?.slice(0, 200)
+    ?? 'Curated product for gay men on Swordfighters.',
+  ogImage: () => product.value?.imageUrl ?? undefined,
+  ogType: 'website',
+  ogUrl: () => `${siteUrl}/products/${productId}`,
+  twitterCard: 'summary_large_image',
+  twitterImage: () => product.value?.imageUrl ?? undefined,
+})
+
+// ---- JSON-LD Product structured data ------------------------------------
+// Google uses this to render rich product cards in search results.
+const jsonLd = computed(() => {
+  const p = product.value
+  if (!p) return null
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: p.title,
+    description: p.description,
+    image: p.imageUrl,
+    sku: p.externalId,
+    brand: { '@type': 'Brand', name: p.platform },
+    category: p.category?.name,
+    offers: {
+      '@type': 'Offer',
+      url: `${siteUrl}/products/${p.id}`,
+      priceCurrency: p.currency,
+      price: p.price,
+      availability: p.status === 'ACTIVE'
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+    },
+    ...(p.rating ? {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: p.rating,
+        reviewCount: p.reviewCount || 1,
+      },
+    } : {}),
+    ...(p.reviews && p.reviews.length > 0 ? {
+      review: p.reviews.map((r) => ({
+        '@type': 'Review',
+        author: { '@type': 'Organization', name: r.authorName },
+        datePublished: r.createdAt,
+        reviewBody: r.content,
+        name: r.title,
+        reviewRating: {
+          '@type': 'Rating',
+          ratingValue: r.rating,
+          bestRating: 5,
+          worstRating: 1,
+        },
+      })),
+    } : {}),
+  }
+})
+
+useHead({
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: computed(() => jsonLd.value ? JSON.stringify(jsonLd.value) : ''),
+    },
+  ],
+})
 
 // Handle affiliate link click
 const handleAffiliateClick = (url: string) => {
@@ -144,41 +218,68 @@ const handleAffiliateClick = (url: string) => {
           </div>
         </div>
 
-        <!-- Reviews Section (if any) -->
-        <div v-if="product.reviews && product.reviews.length > 0" class="border-t border-gray-200 p-8">
-          <h2 class="text-2xl font-bold text-gray-900 mb-6">Our Reviews</h2>
+        <!-- Reviews Section -->
+        <div v-if="product.reviews && product.reviews.length > 0" class="border-t border-gray-200 dark:border-gray-700 p-8">
+          <div class="flex items-baseline justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Our Reviews</h2>
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{ product.reviews.length }} {{ product.reviews.length === 1 ? 'review' : 'reviews' }}
+            </span>
+          </div>
           <div class="space-y-6">
-            <div
+            <article
               v-for="review in product.reviews"
               :key="review.id"
-              class="border border-gray-200 rounded-lg p-6"
+              class="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800"
             >
-              <div class="flex items-center justify-between mb-3">
+              <header class="flex items-start justify-between gap-4 mb-3">
                 <div>
-                  <h4 v-if="review.title" class="font-semibold text-gray-900">{{ review.title }}</h4>
-                  <p class="text-sm text-gray-600">by {{ review.authorName }}</p>
+                  <h3 v-if="review.title" class="font-semibold text-gray-900 dark:text-gray-100">
+                    {{ review.title }}
+                  </h3>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">
+                    by {{ review.authorName }}
+                    <time :datetime="review.createdAt" class="text-gray-400 dark:text-gray-500">
+                      · {{ new Date(review.createdAt).toLocaleDateString() }}
+                    </time>
+                  </p>
                 </div>
-                <div class="flex items-center">
-                  <span class="text-yellow-500">★</span>
-                  <span class="ml-1 font-semibold">{{ review.rating }}/5</span>
+                <div class="flex flex-col items-end gap-1">
+                  <div class="flex" :aria-label="`${review.rating} out of 5 stars`">
+                    <span
+                      v-for="i in 5"
+                      :key="i"
+                      :class="i <= review.rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'"
+                      aria-hidden="true"
+                    >★</span>
+                  </div>
+                  <span
+                    v-if="review.isFeatured"
+                    class="inline-flex rounded-full bg-indigo-100 dark:bg-indigo-900/50 px-2 text-xs font-semibold text-indigo-800 dark:text-indigo-200"
+                  >
+                    Featured
+                  </span>
+                </div>
+              </header>
+
+              <p class="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-line">{{ review.content }}</p>
+
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div v-if="review.pros.length > 0">
+                  <p class="text-sm font-medium text-green-700 dark:text-green-400 mb-1">Pros</p>
+                  <ul class="text-sm text-gray-600 dark:text-gray-400 list-disc list-inside space-y-1">
+                    <li v-for="pro in review.pros" :key="pro">{{ pro }}</li>
+                  </ul>
+                </div>
+
+                <div v-if="review.cons.length > 0">
+                  <p class="text-sm font-medium text-red-700 dark:text-red-400 mb-1">Cons</p>
+                  <ul class="text-sm text-gray-600 dark:text-gray-400 list-disc list-inside space-y-1">
+                    <li v-for="con in review.cons" :key="con">{{ con }}</li>
+                  </ul>
                 </div>
               </div>
-              <p class="text-gray-700 mb-4">{{ review.content }}</p>
-
-              <div v-if="review.pros && review.pros.length > 0" class="mb-3">
-                <p class="text-sm font-medium text-green-700 mb-1">Pros:</p>
-                <ul class="text-sm text-gray-600 list-disc list-inside">
-                  <li v-for="pro in review.pros" :key="pro">{{ pro }}</li>
-                </ul>
-              </div>
-
-              <div v-if="review.cons && review.cons.length > 0">
-                <p class="text-sm font-medium text-red-700 mb-1">Cons:</p>
-                <ul class="text-sm text-gray-600 list-disc list-inside">
-                  <li v-for="con in review.cons" :key="con">{{ con }}</li>
-                </ul>
-              </div>
-            </div>
+            </article>
           </div>
         </div>
       </div>
