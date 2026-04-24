@@ -60,11 +60,11 @@ const handlePageChange = (page: number) => {
       type="button"
       @click="handlePageChange(pagination.page - 1)"
       :disabled="pagination.page === 1"
-      class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 text-sm font-medium rounded-input border transition-colors duration-base ease-smooth disabled:opacity-50 disabled:cursor-not-allowed"
       :class="
         pagination.page === 1
-          ? 'border-gray-200 text-gray-400'
-          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+          ? 'border-gray-200 text-ink-subtle'
+          : 'border-steel text-ink-muted hover:bg-surface-light dark:hover:bg-surface-raised dark:border-gray-600 dark:text-ink-subtle'
       "
     >
       Previous
@@ -80,18 +80,18 @@ const handlePageChange = (page: number) => {
           v-if="typeof page === 'number'"
           type="button"
           @click="handlePageChange(page)"
-          class="min-w-[40px] h-10 px-3 text-sm font-medium rounded-lg transition-colors"
+          class="min-w-[40px] h-10 px-3 text-sm font-medium rounded-input transition-colors duration-base ease-smooth"
           :class="
             page === pagination.page
-              ? 'bg-indigo-600 text-white'
-              : 'text-gray-700 hover:bg-gray-50 border border-gray-300'
+              ? 'bg-brand text-ink-inverse'
+              : 'text-ink-muted hover:bg-surface-light dark:hover:bg-surface-raised border border-steel dark:border-gray-600'
           "
         >
           {{ page }}
         </button>
         <span
           v-else
-          class="px-2 text-gray-400"
+          class="px-2 text-ink-subtle"
         >
           {{ page }}
         </span>
@@ -103,11 +103,11 @@ const handlePageChange = (page: number) => {
       type="button"
       @click="handlePageChange(pagination.page + 1)"
       :disabled="pagination.page === pagination.pages"
-      class="px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      class="px-4 py-2 text-sm font-medium rounded-input border transition-colors duration-base ease-smooth disabled:opacity-50 disabled:cursor-not-allowed"
       :class="
         pagination.page === pagination.pages
-          ? 'border-gray-200 text-gray-400'
-          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+          ? 'border-gray-200 text-ink-subtle'
+          : 'border-steel text-ink-muted hover:bg-surface-light dark:hover:bg-surface-raised dark:border-gray-600 dark:text-ink-subtle'
       "
     >
       Next

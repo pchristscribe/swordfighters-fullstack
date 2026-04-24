@@ -151,7 +151,7 @@ describe('ProductCard', () => {
     expect(link.attributes('href')).toBe('/products/1')
   })
 
-  it('should apply responsive styling classes', () => {
+  it('should apply brand token styling classes', () => {
     const wrapper = mount(ProductCard, {
       props: { product: mockProduct },
       global: {
@@ -160,9 +160,12 @@ describe('ProductCard', () => {
     })
 
     const article = wrapper.find('article')
-    expect(article.classes()).toContain('bg-white')
-    expect(article.classes()).toContain('rounded-lg')
-    expect(article.classes()).toContain('shadow-sm')
-    expect(article.classes()).toContain('hover:shadow-md')
+    // Verify migration from indigo-*/gray-* defaults to named brand tokens
+    expect(article.classes()).toContain('bg-surface')
+    expect(article.classes()).toContain('rounded-card')
+    expect(article.classes()).toContain('shadow-card')
+    expect(article.classes()).toContain('hover:shadow-raised')
+    expect(article.classes()).not.toContain('bg-white')
+    expect(article.classes()).not.toContain('rounded-lg')
   })
 })

@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProductStore } from '../app/stores/products'
 
-// Mock the useApi composable as a global function
-const mockUseApi = vi.fn(() => ({
+// The product store fetches through useSupabaseProducts (auto-imported by
+// Nuxt at runtime). In tests we stub the global so the store can resolve it.
+const mockUseSupabaseProducts = vi.fn(() => ({
   getProducts: vi.fn().mockResolvedValue({
     products: [
       {
@@ -35,10 +36,10 @@ const mockUseApi = vi.fn(() => ({
       slug: 'test-category',
     }
   ]),
+  searchProducts: vi.fn().mockResolvedValue([]),
 }))
 
-// Set up global mock
-vi.stubGlobal('useApi', mockUseApi)
+vi.stubGlobal('useSupabaseProducts', mockUseSupabaseProducts)
 
 describe('Product Store', () => {
   beforeEach(() => {

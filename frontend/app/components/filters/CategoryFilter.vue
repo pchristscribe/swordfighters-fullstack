@@ -23,7 +23,7 @@ const handleChange = (event: Event) => {
   <div>
     <label
       for="category-filter"
-      class="block text-sm font-medium text-gray-700 mb-2"
+      class="block text-sm font-medium text-ink-muted dark:text-ink-subtle mb-2"
     >
       Category
     </label>
@@ -31,7 +31,7 @@ const handleChange = (event: Event) => {
       id="category-filter"
       :value="modelValue"
       @change="handleChange"
-      class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+      class="w-full border border-steel rounded-input px-4 py-2.5 bg-surface dark:bg-surface-dark text-ink dark:text-ink-inverse focus:ring-2 focus:ring-brand focus:border-transparent transition-colors duration-base dark:border-gray-600"
     >
       <option value="">
         All Categories

@@ -7,7 +7,7 @@ export default defineNuxtConfig({
     port: 3000,
   },
 
-  modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt', 'nuxt-headlessui', '@nuxtjs/supabase'],
+  modules: ['@nuxtjs/tailwindcss', '@pinia/nuxt', 'nuxt-headlessui', '@nuxtjs/supabase', '@sentry/nuxt/module'],
 
   // Optionally change the default prefix.
   headlessui: {
@@ -39,6 +39,15 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'Discover curated products from DHgate, AliExpress, Amazon, and Wish' },
+      ],
+      link: [
+        // Dosis variable font (weights 200–800) via Google Fonts
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Dosis:wght@200..800&display=swap',
+        },
       ],
     },
   },

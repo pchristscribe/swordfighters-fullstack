@@ -1,198 +1,204 @@
 # Swordfighters App
 
-An affiliate marketing platform targeting gay men, curating products from DHgate, AliExpress, Amazon, and Wish.
+An affiliate marketing platform targeting gay men, curating products from DHgate, AliExpress, Amazon, and Wish. Features product reviews, seasonal recommendations, and FTC-compliant affiliate disclosures.
 
 ## Quick Start
 
 ```bash
-# Start infrastructure (PostgreSQL & Redis)
+# 1. Copy environment config
+cp .env.example .env
+
+# 2. Start infrastructure (PostgreSQL & Redis)
 docker-compose up -d
 
-# Start admin frontend (WebAuthn admin panel)
-cd admin-frontend
-npm install
-npm run dev  # Runs on http://localhost:3002
+# 3. Start admin frontend (Port 3002)
+cd admin-frontend && npm install && npm run dev
 
-# Start user frontend (product catalog)
-cd frontend
-npm install
-npm run dev  # Runs on http://localhost:3000
+# 4. Start user frontend (Port 3000)
+cd frontend && npm install && npm run dev
 ```
 
 ## Project Structure
 
 ```
-ProjectXY/
-├── admin-frontend/        # Admin panel with WebAuthn authentication
-│   ├── app/              # Nuxt 4 app directory
-│   ├── tests/            # Vitest tests for admin features
-│   └── vitest.config.ts  # Test configuration
+swordfighters-fullstack/
+├── admin-frontend/            # Admin panel — WebAuthn authentication (Port 3002)
+│   ├── app/
+│   │   ├── components/        # DarkModeToggle
+│   │   ├── composables/       # useCsrf, useDarkMode, useSupabaseAdmin
+│   │   ├── layouts/           # default.vue
+│   │   ├── middleware/        # auth.ts (route guard)
+│   │   ├── pages/             # dashboard, login, products, categories, reviews, diagnostic
+│   │   ├── stores/            # auth.ts (Pinia)
+│   │   ├── types/             # database.types.ts, supabase.ts
+│   │   └── utils/             # security.ts
+│   └── tests/                 # auth, darkMode, security test suites
 │
-├── frontend/             # User-facing product catalog
-│   ├── app/              # Nuxt 4 app directory
-│   ├── tests/            # Vitest tests for frontend
-│   └── vitest.config.ts  # Test configuration
+├── frontend/                  # User-facing product catalog (Port 3000)
+│   ├── app/
+│   │   ├── components/        # ProductCard, SearchBar, filters/, feedback/
+│   │   ├── composables/       # useDarkMode, useApi, useToast, useSupabaseProducts
+│   │   ├── layouts/           # default.vue
+│   │   ├── pages/             # index, products/[id], search-demo
+│   │   ├── stores/            # filters.ts, cart.ts, products.ts (Pinia)
+│   │   └── types/             # index.ts, filters.ts, database.types.ts, supabase.ts
+│   └── tests/                 # 10 test files covering components, stores, composables
 │
-├── backend/              # Backend infrastructure (external service)
-│   └── node_modules/     # Backend dependencies
-│
-├── mcp-dhgate/           # DHgate MCP server for product scraping
-│
-├── docker-compose.yml    # PostgreSQL + Redis infrastructure
-│
-├── CLAUDE.md             # Project guidance for Claude Code
-├── ADMIN_PANEL_SETUP.md  # WebAuthn admin setup guide
-├── TEST_COVERAGE_SUMMARY.md      # Comprehensive test documentation
-└── VALIDATION_BUGS_FOUND.md      # Security vulnerabilities found by tests
+├── backend/                   # Backend API (external service — not actively developed here)
+├── backend-security-reference/ # Security reference implementation (middleware, routes, utils)
+├── mcp-dhgate/                # DHgate MCP server for product scraping
+├── supabase/migrations/       # Database migration files
+├── .github/                   # CI/CD workflows + issue templates
+├── docker-compose.yml         # PostgreSQL 16 + Redis 7
+└── .env.example               # Environment variable template
 ```
 
 ## Architecture
 
-### Frontend Stack
-- **Framework**: Nuxt 4 (Vue 3 + SSR)
-- **Styling**: Tailwind CSS
-- **State Management**: Pinia
-- **Testing**: Vitest with Vue Test Utils
+### Tech Stack
 
-### Admin Panel Features
-- **WebAuthn Authentication**: Passwordless login with hardware security keys (YubiKey, Touch ID, Face ID)
-- **Secure Sessions**: Redis-backed session management
-- **Full CRUD Interface**: Complete UI for managing products, categories, and reviews
-  - Product management with search, filters, and bulk operations
-  - Category management with SEO fields
-  - Review moderation with pros/cons lists
-  - Form validation and double-submit prevention
-  - Responsive design with mobile support
+| Layer | Technology |
+|-------|-----------|
+| Admin Frontend | Nuxt 4, Vue 3, Pinia, Tailwind CSS, `@simplewebauthn/browser` |
+| User Frontend | Nuxt 4, Vue 3, Pinia, Tailwind CSS, Headless UI |
+| Database | Supabase (PostgreSQL) — `@nuxtjs/supabase` in both frontends |
+| Monitoring | Sentry (`@sentry/nuxt`) in both frontends |
+| Testing | Vitest + Vue Test Utils + happy-dom |
+| Infrastructure | Docker Compose (PostgreSQL 16 + Redis 7) |
+| Backend API | Fastify + Prisma (external service) |
 
-### Infrastructure
-- **Database**: PostgreSQL (via Docker)
-- **Cache**: Redis (via Docker)
-- **Task Queue**: Bull (Redis-backed for scraping jobs)
-- **Backend API**: External service (not in this repository)
+### Admin Panel (`admin-frontend/`)
 
-## Documentation
+- **Authentication**: WebAuthn passwordless login — hardware keys (YubiKey), Touch ID, Face ID, Windows Hello
+- **CSRF protection**: `useCsrf` composable sends `X-CSRF-Token` on all mutations
+- **CSP headers**: Configured in `nuxt.config.ts` — prevents XSS, clickjacking, and unauthorized resource loading
+- **Pages**: Dashboard, Products CRUD, Categories CRUD, Reviews moderation, Diagnostic, WebAuthn test
+- **Port**: 3002 | HMR: 24678
 
-### Getting Started
-- **[ADMIN_PANEL_SETUP.md](./ADMIN_PANEL_SETUP.md)** - Complete WebAuthn setup and admin panel guide
-- **[CLAUDE.md](./CLAUDE.md)** - Project instructions for Claude Code
+### User Frontend (`frontend/`)
 
-### Testing
-- **[TEST_COVERAGE_SUMMARY.md](./TEST_COVERAGE_SUMMARY.md)** - Comprehensive test coverage documentation (66 validation tests)
-- **[VALIDATION_BUGS_FOUND.md](./VALIDATION_BUGS_FOUND.md)** - Security vulnerabilities identified by test suite (52 bugs documented)
+- **Product catalog** with category, platform, price range, rating filters + sorting
+- **URL-synced filters**: Filter state serializes to/from query params for shareable links
+- **Components**: ProductCard, ProductGrid, SearchBar, Pagination, filter sidebar, toast/modal/alert feedback
+- **Headless UI**: Accessible components via `nuxt-headlessui` (prefix: `Headless`)
+- **Port**: 3000 | HMR: 24677
 
-### Development Guides
-- **Frontend README**: [frontend/README.md](./frontend/README.md)
-- **MCP Server**: [mcp-dhgate/README.md](./mcp-dhgate/README.md)
+### Design System (shared)
+
+Both frontends use identical Tailwind config:
+- **Font**: Dosis (variable weight 200–800, Google Fonts)
+- **Colors**: `brand` (#8B1E2D), `accent` (#D6A77A), `surface`, `ink`, `status` variants
+- **Dark mode**: `class` strategy via `useDarkMode` composable + `DarkModeToggle.vue`
 
 ## Running Tests
 
 ```bash
-# Admin frontend tests
+# Admin frontend
 cd admin-frontend
 npm test              # Run all tests
 npm run test:watch    # Watch mode
+npm run test:ui       # Vitest visual UI
 npm run test:coverage # Coverage report
 
-# User frontend tests
+# User frontend
 cd frontend
-npm test              # Run all tests
-npm run test:watch    # Watch mode
-npm run test:coverage # Coverage report
+npm test
+npm run test:watch
+npm run test:ui
+npm run test:coverage
 ```
+
+**Test suite stats**: 13 test files, ~66 tests across auth, security, components, stores, and composables.
+See [TEST_COVERAGE_SUMMARY.md](./TEST_COVERAGE_SUMMARY.md) for detailed metrics.
 
 ## Development Workflow
 
-### 1. Infrastructure Setup
-```bash
-# Start PostgreSQL and Redis
-docker-compose up -d
+### 1. Infrastructure
 
-# Verify services are running
-docker-compose ps
+```bash
+docker-compose up -d     # Start PostgreSQL + Redis
+docker-compose ps        # Check health
+docker-compose down      # Stop
+docker-compose down -v   # Stop and delete volumes (⚠️ data loss)
 ```
 
-### 2. Environment Configuration
-Copy `.env.example` to `.env` and update values:
+### 2. Database Access
+
 ```bash
-cp .env.example .env
+# PostgreSQL shell
+docker exec -it swordfighters-postgres psql -U swordfighters -d swordfighters_db
+
+# Redis CLI
+docker exec -it swordfighters-redis redis-cli -a dev_redis_password
 ```
 
-### 3. Frontend Development
-```bash
-# Admin Panel (http://localhost:3002)
-cd admin-frontend
-npm install
-npm run dev
+### 3. Environment Variables
 
-# User Frontend (http://localhost:3000)
-cd frontend
-npm install
-npm run dev
-```
+Key variables (full list in `.env.example`):
 
-## Testing & Quality Assurance
+| Variable | Description |
+|----------|-------------|
+| `NUXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NUXT_PUBLIC_SUPABASE_KEY` | Supabase anon key |
+| `SUPABASE_SECRET_KEY` | Service role key (admin only) |
+| `API_BASE_URL` | Backend API base URL |
+| `DATABASE_URL` | PostgreSQL connection string |
 
-The project includes comprehensive validation testing:
+## CI/CD
 
-- **66 Tests Created**: Covering WebAuthn authentication, input validation, and frontend stores
-- **52 Bugs Identified**: Security vulnerabilities documented in VALIDATION_BUGS_FOUND.md
-- **95% Critical Path Coverage**: All major authentication flows tested
-
-See [TEST_COVERAGE_SUMMARY.md](./TEST_COVERAGE_SUMMARY.md) for detailed test metrics.
-
-## Legal Compliance
-
-All affiliate links and sponsored content include FTC-compliant disclosures indicating monetary compensation from affiliate programs.
+GitHub Actions workflows in `.github/workflows/`:
+- `main.yml` — main pipeline
+- `claude.yml` — Claude Code integration
+- `claude-code-review.yml` — automated PR review
+- `eslint.yml` — linting checks
 
 ## Production Deployment
 
-### Frontend Deployments
-- **Admin Frontend**: Vercel (Nuxt optimized)
-- **User Frontend**: Vercel (Nuxt optimized)
+| Service | Platform |
+|---------|---------|
+| Admin Frontend | Vercel |
+| User Frontend | Vercel |
+| Backend API | Railway or Render |
+| Database | Supabase |
+| Monitoring | Sentry |
+| Scraping Jobs | GitHub Actions + Bull queue |
 
-### Infrastructure
-- **Database**: Supabase (PostgreSQL)
-- **Backend API**: Railway or Render
-- **Scraping Jobs**: GitHub Actions + Bull queue
-- **Monitoring**: Sentry
+See [ADMIN_PANEL_SETUP.md](./ADMIN_PANEL_SETUP.md) for production environment variables and deployment checklist.
 
-### Environment Variables
-See [ADMIN_PANEL_SETUP.md](./ADMIN_PANEL_SETUP.md#production-deployment) for production environment configuration.
+## Documentation
 
-## Contributing
+| File | Description |
+|------|-------------|
+| [CLAUDE.md](./CLAUDE.md) | AI assistant guidelines and codebase reference |
+| [ADMIN_PANEL_SETUP.md](./ADMIN_PANEL_SETUP.md) | WebAuthn setup and admin panel guide |
+| [TEST_COVERAGE_SUMMARY.md](./TEST_COVERAGE_SUMMARY.md) | Test metrics and coverage details |
+| [VALIDATION_BUGS_FOUND.md](./VALIDATION_BUGS_FOUND.md) | Security vulnerabilities identified by tests |
+| [SECURITY_GUIDE.md](./SECURITY_GUIDE.md) | Defense-in-depth security architecture |
+| [frontend/FILTERING_SYSTEM.md](./frontend/FILTERING_SYSTEM.md) | Product filter system architecture |
+| [admin-frontend/README.md](./admin-frontend/README.md) | Admin panel setup |
+| [frontend/README.md](./frontend/README.md) | User frontend setup |
+| [mcp-dhgate/README.md](./mcp-dhgate/README.md) | DHgate MCP server |
 
-### Code Style
-- No semicolons
-- Single quotes
+## Code Style
+
+- No semicolons, single quotes, 2-space indentation
 - No unnecessary curly braces
-- 2-space indentation
 - Import order: external → internal → types
-
-See [CLAUDE.md](./CLAUDE.md) for detailed code style rules.
-
-### Testing Requirements
-All new features require:
-- ✅ Vitest tests with >80% coverage
-- ✅ Input validation tests for all user inputs
-- ✅ Error handling tests for API calls
-
-## Support & Resources
-
-- **WebAuthn Guide**: https://webauthn.guide/
-- **SimpleWebAuthn Docs**: https://simplewebauthn.dev/
-- **Nuxt 4 Docs**: https://nuxt.com/docs
-- **Vitest Docs**: https://vitest.dev/
+- All inputs validated at system boundaries
+- No browser-only code at module level (SSR safety)
 
 ## Security
 
-This project implements:
-- ✅ **WebAuthn passwordless authentication** (phishing-resistant)
-- ✅ **Input validation** at all layers
-- ✅ **Redis-backed sessions** with secure cookies
-- ✅ **Rate limiting** on authentication endpoints
-- ⚠️ **Known vulnerabilities** documented in VALIDATION_BUGS_FOUND.md (fixes in progress)
+- **WebAuthn**: Phishing-resistant passwordless auth (no passwords stored)
+- **CSP headers**: Configured in admin frontend `nuxt.config.ts`
+- **CSRF**: Token-based protection via `useCsrf` composable
+- **Input sanitization**: `utils/security.ts` — URL validation, HTML stripping
+- **Known issues**: Documented in [VALIDATION_BUGS_FOUND.md](./VALIDATION_BUGS_FOUND.md)
+
+## Legal
+
+All affiliate links and sponsored content include FTC-compliant disclosures indicating monetary compensation from affiliate programs.
 
 ---
 
 **Status**: Active Development
-**Test Coverage**: 66 tests, 52 security issues identified and documented
