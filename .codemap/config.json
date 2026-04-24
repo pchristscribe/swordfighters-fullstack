@@ -1,0 +1,14 @@
+{
+  "only": [
+    "ts",
+    "js",
+    "vue",
+    "yml",
+    "gitignore"
+  ],
+  "budgets": {},
+  "routing": {
+    "retrieval": {}
+  },
+  "drift": {}
+}
