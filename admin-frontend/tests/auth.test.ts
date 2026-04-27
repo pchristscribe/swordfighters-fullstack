@@ -18,6 +18,11 @@ if (typeof window === 'undefined') {
 }
 global.window.PublicKeyCredential = class MockPublicKeyCredential {}
 
+// Stub rate limiter so it never blocks during auth unit tests
+vi.mock('../app/composables/useRateLimit', () => ({
+  useRateLimit: () => ({ check: () => ({ allowed: true }), record: () => {}, reset: () => {} }),
+}))
+
 // Import after mocks are set up
 import { useAuthStore } from '../app/stores/auth'
 
