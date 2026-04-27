@@ -65,7 +65,7 @@ export const SEASON_LIST: Season[] = Object.values(SEASONS)
 export function getCurrentSeason(date: Date = new Date()): Season {
   const month = date.getMonth() + 1 // 1-12
   if (month === 6) return SEASONS.pride!
-  if (month === 12) return SEASONS.holiday!
+  if (month === 11 || month === 12) return SEASONS.holiday!
   const match = SEASON_LIST.find((s) => s.months.includes(month))
   return match ?? SEASONS.summer!
 }

@@ -157,6 +157,7 @@ export const useAuthStore = defineStore('auth', {
         })
 
         console.log('✅ Registration verified:', verificationResponse)
+        if (verificationResponse.verified) rateLimit.reset('register')
         return verificationResponse.verified
       } catch (err: any) {
         rateLimit.record('register')
@@ -246,6 +247,7 @@ export const useAuthStore = defineStore('auth', {
         if (verificationResponse.verified && verificationResponse.admin) {
           console.log('✅ Authentication successful')
           this.admin = verificationResponse.admin
+          rateLimit.reset('login')
           rotateCsrfToken()
           return true
         }

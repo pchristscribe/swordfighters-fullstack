@@ -57,6 +57,7 @@ jobs:
     name: E2E tests
     runs-on: ubuntu-latest
     needs: [build]
+    if: ${{ secrets.NUXT_PUBLIC_SUPABASE_URL != '' }}
     strategy:
       fail-fast: false
       matrix:

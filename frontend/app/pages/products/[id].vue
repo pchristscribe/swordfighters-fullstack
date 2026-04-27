@@ -53,11 +53,11 @@ const jsonLd = computed(() => {
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
     },
-    ...(p.rating ? {
+    ...(p.rating && (p.reviewCount ?? p.reviews?.length) ? {
       aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: p.rating,
-        reviewCount: p.reviewCount || 1,
+        reviewCount: p.reviewCount || p.reviews?.length || 0,
       },
     } : {}),
     ...(p.reviews && p.reviews.length > 0 ? {

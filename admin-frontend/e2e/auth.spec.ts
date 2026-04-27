@@ -25,12 +25,12 @@ test.describe('Admin Authentication', () => {
     await expect(page.locator('text=/invalid|format|email/i')).toBeVisible()
   })
 
-  test('CSP header is present', async ({ page }) => {
+  test('CSP is present via header or meta tag', async ({ page }) => {
     const response = await page.goto('/login')
     const csp = await response?.headerValue('content-security-policy')
     if (!csp) {
-      const html = await page.content()
-      expect(html).toContain('Content-Security-Policy')
+      const metaCsp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
+      expect(metaCsp).toBeTruthy()
     }
   })
 

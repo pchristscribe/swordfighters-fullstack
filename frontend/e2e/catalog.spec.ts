@@ -21,12 +21,12 @@ test.describe('Product Catalog', () => {
     expect(response?.status()).toBeLessThan(500)
   })
 
-  test('CSP header is present', async ({ page }) => {
+  test('CSP is present via header or meta tag', async ({ page }) => {
     const response = await page.goto('/')
     const csp = await response?.headerValue('content-security-policy')
     if (!csp) {
-      const html = await page.content()
-      expect(html).toContain('Content-Security-Policy')
+      const metaCsp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content')
+      expect(metaCsp).toBeTruthy()
     }
   })
 })
