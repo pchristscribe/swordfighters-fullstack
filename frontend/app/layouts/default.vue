@@ -3,16 +3,26 @@
     <!-- Header -->
     <header class="bg-surface dark:bg-surface-raised shadow-card border-b border-gray-100 dark:border-gray-700 transition-colors duration-slow">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div class="flex items-center justify-between">
-          <NuxtLink to="/" class="text-2xl font-bold text-brand dark:text-brand-hover">
+        <div class="flex items-center justify-between gap-4">
+          <NuxtLink to="/" class="text-2xl font-bold text-brand dark:text-brand-hover whitespace-nowrap">
             Swordfighters
           </NuxtLink>
+          <div class="hidden sm:block flex-1 max-w-md mx-4">
+            <SearchBar
+              placeholder="Search products..."
+              aria-label="Search products"
+              @select="handleSearchSelect"
+            />
+          </div>
           <nav class="hidden md:flex items-center space-x-8">
             <NuxtLink to="/" class="text-ink dark:text-ink-muted hover:text-brand dark:hover:text-brand-hover transition-colors duration-base">
               Products
             </NuxtLink>
             <NuxtLink to="/categories" class="text-ink dark:text-ink-muted hover:text-brand dark:hover:text-brand-hover transition-colors duration-base">
               Categories
+            </NuxtLink>
+            <NuxtLink :to="`/seasonal/${currentSeason.slug}`" class="text-ink dark:text-ink-muted hover:text-brand dark:hover:text-brand-hover transition-colors duration-base">
+              {{ currentSeason.label }}
             </NuxtLink>
 
             <!-- Auth controls -->
@@ -32,6 +42,14 @@
               Sign in
             </NuxtLink>
           </nav>
+        </div>
+        <!-- Mobile search row -->
+        <div class="sm:hidden mt-3">
+          <SearchBar
+            placeholder="Search products..."
+            aria-label="Search products"
+            @select="handleSearchSelect"
+          />
         </div>
       </div>
     </header>
@@ -66,12 +84,21 @@
 </template>
 
 <script setup lang="ts">
+import type { Product } from '~/types'
+import { getCurrentSeason } from '~/utils/seasons'
+
 const { init } = useDarkMode()
 const { user, signOut } = useAuth()
 
 onMounted(() => {
   init()
 })
+
+const currentSeason = getCurrentSeason()
+
+const handleSearchSelect = (product: Product) => {
+  navigateTo(`/products/${product.id}`)
+}
 
 async function handleSignOut() {
   try {

@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 import { getOrCreateCsrfToken, rotateCsrfToken, clearCsrfToken } from '~/utils/security'
+import { useRateLimit } from '~/composables/useRateLimit'
+
+const rateLimit = useRateLimit()
 
 interface Admin {
   id: string
@@ -109,6 +112,13 @@ export const useAuthStore = defineStore('auth', {
       const validatedEmail = emailValidation.normalized!
       const sanitizedDeviceName = sanitizeDeviceName(deviceName)
 
+      const rateLimitCheck = rateLimit.check('register')
+      if (!rateLimitCheck.allowed) {
+        const seconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000)
+        this.error = `Too many attempts. Please try again in ${seconds} seconds.`
+        return false
+      }
+
       this.loading = true
       this.error = null
 
@@ -147,8 +157,10 @@ export const useAuthStore = defineStore('auth', {
         })
 
         console.log('✅ Registration verified:', verificationResponse)
+        if (verificationResponse.verified) rateLimit.reset('register')
         return verificationResponse.verified
       } catch (err: any) {
+        rateLimit.record('register')
         console.error('❌ Registration error:', err)
 
         // Provide user-friendly error messages
@@ -192,6 +204,13 @@ export const useAuthStore = defineStore('auth', {
 
       const validatedEmail = emailValidation.normalized!
 
+      const rateLimitCheck = rateLimit.check('login')
+      if (!rateLimitCheck.allowed) {
+        const seconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000)
+        this.error = `Too many attempts. Please try again in ${seconds} seconds.`
+        return false
+      }
+
       this.loading = true
       this.error = null
 
@@ -228,11 +247,13 @@ export const useAuthStore = defineStore('auth', {
         if (verificationResponse.verified && verificationResponse.admin) {
           console.log('✅ Authentication successful')
           this.admin = verificationResponse.admin
+          rateLimit.reset('login')
           rotateCsrfToken()
           return true
         }
         return false
       } catch (err: any) {
+        rateLimit.record('login')
         console.error('❌ Authentication error:', err)
 
         // Provide user-friendly error messages

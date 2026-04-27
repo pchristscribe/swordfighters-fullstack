@@ -47,14 +47,13 @@ export default defineNuxtConfig({
           'http-equiv': 'Content-Security-Policy',
           content: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Nuxt requires unsafe-inline/eval for HMR in dev
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Tailwind + Google Fonts stylesheet
-            "img-src 'self' https: data:", // Allow HTTPS images and data URIs
-            "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts binary files
-            "connect-src 'self' http://localhost:* https: wss://oqkfirmzkdfkfcvzqipo.supabase.co", // Allow API and Supabase connections
-            "frame-ancestors 'none'", // Prevent clickjacking
+            `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== 'production' ? " 'unsafe-eval'" : ''}`,
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "img-src 'self' https: data:",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "connect-src 'self' http://localhost:* https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
             "base-uri 'self'",
-            "form-action 'self'"
+            "form-action 'self'",
           ].join('; ')
         }
       ],
