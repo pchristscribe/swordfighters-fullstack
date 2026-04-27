@@ -1,10 +1,14 @@
-const attempts = new Map<string, { count: number; resetAt: number }>()
-
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 60_000
 const LOCKOUT_MS = 300_000
 
+const noop = { check: () => ({ allowed: true } as const), record: () => {}, reset: () => {} }
+
 export function useRateLimit() {
+  if (import.meta.server) return noop
+
+  const attempts = new Map<string, { count: number; resetAt: number }>()
+
   function check(action: string): { allowed: boolean; retryAfterMs?: number } {
     const now = Date.now()
     const entry = attempts.get(action)

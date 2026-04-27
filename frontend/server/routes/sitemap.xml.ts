@@ -73,6 +73,9 @@ export default defineEventHandler(async (event) => {
           },
         },
       )
+      if (res.length === 5000) {
+        console.warn('sitemap.xml: product count hit 5000 limit — implement sitemap index for full coverage')
+      }
       for (const row of res) {
         urls.push({
           loc: `${siteUrl}/products/${row.id}`,

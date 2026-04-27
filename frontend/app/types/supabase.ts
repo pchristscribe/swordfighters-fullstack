@@ -132,6 +132,46 @@ export interface Database {
           updated_at?: string
         }
       }
+      reviews: {
+        Row: {
+          id: string
+          product_id: string
+          rating: number
+          title: string | null
+          content: string
+          pros: string[]
+          cons: string[]
+          author_name: string
+          is_featured: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          rating: number
+          title?: string | null
+          content: string
+          pros?: string[]
+          cons?: string[]
+          author_name: string
+          is_featured?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          rating?: number
+          title?: string | null
+          content?: string
+          pros?: string[]
+          cons?: string[]
+          author_name?: string
+          is_featured?: boolean
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

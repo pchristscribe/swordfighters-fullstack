@@ -63,7 +63,6 @@ export default defineNuxtConfig({
             "img-src 'self' https: data:",
             "font-src 'self' data: https://fonts.gstatic.com",
             "connect-src 'self' http://localhost:* https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
-            "frame-ancestors 'none'",
             "base-uri 'self'",
             "form-action 'self'",
           ].join('; ')

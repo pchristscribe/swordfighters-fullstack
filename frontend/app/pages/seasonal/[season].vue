@@ -7,33 +7,24 @@ const slug = computed(() => route.params.season as string)
 const season = computed(() => getSeason(slug.value))
 
 const supabaseProducts = useSupabaseProducts()
-const products = ref<Product[]>([])
-const pagination = ref<Pagination | null>(null)
-const loading = ref(false)
-const error = ref<string | null>(null)
 
-const load = async () => {
-  const s = season.value
-  if (!s) return
-  loading.value = true
-  error.value = null
-  try {
-    const data = await supabaseProducts.getProducts({
+const { data, pending: loading, error } = await useAsyncData(
+  `season-${slug.value}`,
+  () => {
+    const s = season.value
+    if (!s) return Promise.resolve({ products: [] as Product[], pagination: null as Pagination | null })
+    return supabaseProducts.getProducts({
       tag: s.tag,
       limit: 24,
       sortBy: 'createdAt',
       order: 'desc',
     })
-    products.value = data.products
-    pagination.value = data.pagination
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to load seasonal products'
-  } finally {
-    loading.value = false
-  }
-}
+  },
+  { watch: [slug] },
+)
 
-watch(slug, load, { immediate: true })
+const products = computed(() => data.value?.products ?? [])
+const pagination = computed(() => data.value?.pagination ?? null)
 
 useHead(() => ({
   title: season.value
@@ -103,7 +94,7 @@ useHead(() => ({
         No {{ season.label.toLowerCase() }} products tagged yet. Check back soon.
       </p>
 
-      <p v-if="error" class="text-center text-status-error py-8">{{ error }}</p>
+      <p v-if="error" class="text-center text-status-error py-8">{{ error.message }}</p>
     </template>
   </div>
 </template>

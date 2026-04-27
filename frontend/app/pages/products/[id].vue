@@ -5,8 +5,10 @@ const { public: { siteUrl } } = useRuntimeConfig()
 
 const productId = route.params.id as string
 
-// Fetch on the server so crawlers see fully-rendered meta/JSON-LD.
-await productStore.fetchProduct(productId)
+const { error: fetchError } = await useAsyncData(
+  `product-${productId}`,
+  () => productStore.fetchProduct(productId),
+)
 
 const product = computed(() => productStore?.currentProduct)
 
@@ -286,8 +288,8 @@ const handleAffiliateClick = (url: string) => {
     </div>
 
     <!-- Error State -->
-    <div v-else class="text-center py-12">
-      <p class="text-gray-600 mb-4">Product not found</p>
+    <div v-else-if="fetchError || productStore?.error" class="text-center py-12">
+      <p class="text-gray-600 mb-4">{{ productStore?.error || 'Product not found' }}</p>
       <NuxtLink
         to="/"
         class="inline-block px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"

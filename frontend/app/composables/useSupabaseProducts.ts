@@ -119,7 +119,7 @@ export const useSupabaseProducts = () => {
 
     const product = mapDbProduct(data)
     if (data.affiliate_links) {
-      product.affiliateLinks = (data.affiliate_links as any[]).map((link) => ({
+      product.affiliateLinks = data.affiliate_links.map((link) => ({
         id: link.id,
         productId: link.product_id,
         originalUrl: link.original_url,
@@ -133,9 +133,8 @@ export const useSupabaseProducts = () => {
         updatedAt: link.updated_at,
       }))
     }
-    if ((data as any).reviews) {
-      // Featured reviews first, then by most recent.
-      product.reviews = ((data as any).reviews as any[])
+    if (data.reviews) {
+      product.reviews = data.reviews
         .map((row): Review => ({
           id: row.id,
           productId: row.product_id,
@@ -169,7 +168,7 @@ export const useSupabaseProducts = () => {
     return (data ?? []).map((row) => ({
       ...mapDbCategory(row),
       _count: {
-        products: (row as any).products?.[0]?.count ?? 0,
+        products: (row.products as unknown as Array<{ count: number }>)?.[0]?.count ?? 0,
       },
     }))
   }

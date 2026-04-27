@@ -7,7 +7,7 @@ if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
   exit 1
 fi
 
-PROJECT_REF="${SUPABASE_PROJECT_REF:-oqkfirmzkdfkfcvzqipo}"
+PROJECT_REF="${SUPABASE_PROJECT_REF:?Error: SUPABASE_PROJECT_REF is not set. See .env.example.}"
 
 echo "Linking to Supabase project $PROJECT_REF..."
 npx supabase link --project-ref "$PROJECT_REF"
