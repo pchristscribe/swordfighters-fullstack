@@ -27,7 +27,6 @@ swordfighters-fullstack/
 ├── .github/workflows/         # CI/CD: ci.yml, claude.yml, claude-code-review.yml, eslint.yml
 ├── docker-compose.yml         # PostgreSQL 16 + Redis 7 infrastructure
 ├── package.json               # Root meta-package (Bun + Supabase CLI tooling glue)
-├── railway.json               # (per-service in backend/, frontend/, admin-frontend/)
 ├── .env.example               # Environment variable template
 └── .mcp.json                  # MCP server config (DeepGraph Vue MCP)
 ```
@@ -143,7 +142,7 @@ frontend/
 │   │   ├── useDarkMode.ts
 │   │   ├── useAuth.ts                # Supabase OAuth sign-in / sign-out
 │   │   ├── useToast.ts               # Toast notification system
-│   │   └── useSupabaseProducts.ts    # Supabase product fetching (replaces former useApi)
+│   │   └── useSupabaseProducts.ts    # Supabase product fetching
 │   ├── layouts/
 │   │   └── default.vue
 │   ├── pages/
@@ -202,8 +201,15 @@ backend/
 │   ├── routes/
 │   │   ├── products.js
 │   │   ├── categories.js
-│   │   └── admin/{auth,categories,products,reviews,webauthn}.js
-│   ├── schemas/{review,category}.js   # Fastify JSON schemas
+│   │   └── admin/
+│   │       ├── auth.js
+│   │       ├── categories.js
+│   │       ├── products.js
+│   │       ├── reviews.js
+│   │       └── webauthn.js
+│   ├── schemas/
+│   │   ├── review.js          # Fastify JSON schema
+│   │   └── category.js        # Fastify JSON schema
 │   └── utils/cleanupExpiredChallenges.js
 ├── tests/                     # Vitest unit tests
 ├── package.json
@@ -395,7 +401,8 @@ Key variables (see `.env.example` for full list):
 | `NUXT_PUBLIC_SUPABASE_KEY` | Supabase anon key |
 | `SUPABASE_SECRET_KEY` | Supabase service role key (admin only — never expose client) |
 | `NUXT_PUBLIC_SITE_URL` | Public site URL (canonical links, OG, sitemap) |
-| `NUXT_PUBLIC_API_BASE` / `API_BASE_URL` | Backend API base (default: `http://localhost:3001`) |
+| `NUXT_PUBLIC_API_BASE` | Backend API base, exposed to Nuxt runtime (frontends) |
+| `API_BASE_URL` | Backend API base for server-side / admin (default: `http://localhost:3001`) |
 | `DATABASE_URL` | PostgreSQL connection string for Prisma |
 | `REDIS_URL` / `REDIS_PASSWORD` | Redis connection (default password: `dev_redis_password`) |
 | `SESSION_SECRET` | Backend session secret (32+ chars; required in production) |
