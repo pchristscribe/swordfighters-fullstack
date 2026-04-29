@@ -12,6 +12,9 @@
 -- ── admins: extra columns ────────────────────────────────────────────────
 
 alter table admins
+  -- password_hash backs the email+password fallback path in
+  -- backend/src/routes/admin/auth.js. WebAuthn is the primary login;
+  -- password is kept as an emergency / non-WebAuthn-capable-device fallback.
   add column if not exists password_hash         text,
   add column if not exists is_active             boolean not null default true,
   add column if not exists last_login_at         timestamptz,
