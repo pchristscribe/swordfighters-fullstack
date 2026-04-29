@@ -49,5 +49,10 @@ create index if not exists webauthn_credentials_admin_id_idx
 
 alter table webauthn_credentials enable row level security;
 
-create policy "webauthn_credentials_service_all" on webauthn_credentials
-  for all using (auth.role() = 'service_role');
+-- CREATE POLICY has no IF NOT EXISTS clause in PostgreSQL, so we wrap it
+-- in a DO block to keep this migration idempotent on re-apply.
+do $$ begin
+  create policy "webauthn_credentials_service_all" on webauthn_credentials
+    for all using (auth.role() = 'service_role');
+exception when duplicate_object then null;
+end $$;
