@@ -11,7 +11,7 @@
           Swordfighters Admin
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600">
-          Secure login with hardware security key or biometrics
+          Secure login with hardware security key, biometrics, or password
         </p>
       </div>
 
@@ -50,6 +50,23 @@
               </div>
             </div>
 
+            <div v-if="usePassword">
+              <label for="password" class="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div class="mt-1">
+                <input
+                  id="password"
+                  v-model="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
             <div>
               <button
                 type="submit"
@@ -60,7 +77,19 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
                 <span v-if="authStore.loading">Authenticating...</span>
+                <span v-else-if="usePassword">Sign in with Password</span>
                 <span v-else>Sign in with Security Key</span>
+              </button>
+            </div>
+
+            <div class="text-center">
+              <button
+                type="button"
+                :aria-pressed="usePassword"
+                class="text-sm text-indigo-600 hover:text-indigo-500 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                @click="togglePasswordMode"
+              >
+                {{ usePassword ? 'Use security key instead' : 'Use password instead' }}
               </button>
             </div>
           </form>
@@ -178,11 +207,21 @@ definePageMeta({
 
 const authStore = useAuthStore()
 const email = ref('')
+const password = ref('')
 const deviceName = ref('')
 const showRegister = ref(false)
+const usePassword = ref(false)
+
+const togglePasswordMode = () => {
+  usePassword.value = !usePassword.value
+  authStore.error = null
+  if (!usePassword.value) password.value = ''
+}
 
 const handleLogin = async () => {
-  const success = await authStore.loginWithSecurityKey(email.value)
+  const success = usePassword.value
+    ? await authStore.loginWithPassword(email.value, password.value)
+    : await authStore.loginWithSecurityKey(email.value)
   if (success) {
     await navigateTo('/')
   }
