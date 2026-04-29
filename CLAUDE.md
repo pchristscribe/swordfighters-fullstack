@@ -19,7 +19,7 @@ swordfighters-fullstack/
 ├── backend-security-reference/ # Security reference implementation (middleware, routes, utils)
 ├── mcp-dhgate/                # DHgate MCP server for product scraping
 ├── supabase/
-│   ├── migrations/            # Supabase DB migrations (001 schema, 002 clicks ledger, 003 reviews)
+│   ├── migrations/            # Supabase DB migrations (001 schema, 002 clicks ledger, 003 reviews, 004 admin WebAuthn)
 │   ├── functions/             # Edge functions (e.g. track-click)
 │   └── config.toml
 ├── scripts/                   # Helper scripts (migrate.sh, backup-db.sh)
@@ -39,7 +39,7 @@ swordfighters-fullstack/
 - **Framework**: Nuxt 4 (Vue 3 + SSR), `compatibilityDate: '2025-11-29'`
 - **Port**: 3002 (HMR: 24678)
 - **Modules**: `@pinia/nuxt`, `@nuxtjs/tailwindcss`, `@nuxtjs/supabase`
-- **Auth**: WebAuthn via `@simplewebauthn/browser@^13.2.2` (passwordless with security keys/Touch ID)
+- **Auth**: WebAuthn via `@simplewebauthn/browser@^13.2.2` (primary: security keys/Touch ID; fallback: email + password)
 - **Monitoring**: Sentry (`@sentry/nuxt`)
 - **Testing**: Vitest + Vue Test Utils + happy-dom
 - **Security**: CSRF protection, CSP headers configured in `nuxt.config.ts`
@@ -60,7 +60,7 @@ swordfighters-fullstack/
 - Task Queue: Bull (Redis-backed)
 - WebAuthn: `@simplewebauthn/server` (admin auth)
 - Monitoring: Sentry (`@sentry/node`, `@sentry/profiling-node`)
-- Routes: `src/routes/products.js`, `categories.js`, and `src/routes/admin/{auth,categories,products,reviews,webauthn}.js`
+- Routes: `src/routes/products.js`, `src/routes/categories.js`, and five admin routes: `src/routes/admin/auth.js`, `categories.js`, `products.js`, `reviews.js`, `webauthn.js`
 - Health check: `GET /health` (verifies Postgres + Redis)
 
 ### Infrastructure
@@ -88,7 +88,7 @@ admin-frontend/
 │   │   └── auth.ts              # Route guard for authenticated pages
 │   ├── pages/
 │   │   ├── index.vue            # Dashboard
-│   │   ├── login.vue            # WebAuthn login
+│   │   ├── login.vue            # WebAuthn / password login
 │   │   ├── products/index.vue   # Product management
 │   │   ├── categories.vue       # Category management
 │   │   ├── reviews.vue          # Review moderation
@@ -102,7 +102,7 @@ admin-frontend/
 │   └── utils/
 │       └── security.ts          # Security helpers
 ├── tests/
-│   ├── auth.test.ts             # WebAuthn auth tests (30+)
+│   ├── auth.test.ts             # WebAuthn + password auth tests (174+ total)
 │   ├── darkMode.test.ts
 │   └── security.test.ts
 ├── nuxt.config.ts
@@ -193,6 +193,7 @@ backend/
 │   ├── index.js               # Server entry (Fastify, binds 0.0.0.0:$PORT)
 │   ├── app.js                 # Plugin/route registration
 │   ├── lib/
+│   │   ├── __tests__/         # Unit tests for lib modules (e.g. sentry.test.js)
 │   │   ├── prisma.js          # Prisma client singleton
 │   │   ├── redis.js           # ioredis client
 │   │   ├── sessionStore.js    # connect-redis store
@@ -224,7 +225,7 @@ MCP server for scraping DHgate product data. Has its own `src/` with `index.ts`,
 ### Supabase (`supabase/`)
 
 - `config.toml` — local Supabase CLI config
-- `migrations/` — SQL migrations (`001_initial_schema.sql`, `002_clicks_ledger.sql`, `003_reviews.sql`)
+- `migrations/` — SQL migrations (`001_initial_schema.sql`, `002_clicks_ledger.sql`, `003_reviews.sql`, `004_admin_webauthn.sql`)
 - `functions/track-click/` — Edge Function that records affiliate-link clicks into the clicks ledger
 
 ## Development Setup
@@ -309,14 +310,14 @@ docker-compose down -v        # Remove volumes (⚠️ deletes all data)
 - **Path aliases**: `~/`, `@/` (admin also has `#app`)
 
 ### Test Coverage Stats
-- **66 Tests Created**: WebAuthn auth, input validation, frontend stores, components
+- **174+ Tests**: WebAuthn + password auth, input validation, frontend stores, components
 - **52 Security Bugs Identified**: Documented in `VALIDATION_BUGS_FOUND.md`
 - **95% Critical Path Coverage**: All major authentication flows
 
 ### Key Test Files
 | File | Description |
 |------|-------------|
-| `admin-frontend/tests/auth.test.ts` | WebAuthn auth validation (30+ tests) |
+| `admin-frontend/tests/auth.test.ts` | WebAuthn + password auth validation (174+ tests) |
 | `admin-frontend/tests/security.test.ts` | Input sanitization, XSS, CSRF |
 | `frontend/tests/filters.test.ts` | Filter store and UI |
 | `frontend/tests/SearchBar.test.ts` | Search component (17.9 KB) |
@@ -371,16 +372,17 @@ Both frontends share an identical Tailwind config with:
 
 ## Authentication
 
-### Admin Frontend — WebAuthn
+### Admin Frontend — WebAuthn + Password fallback
 
-WebAuthn (passwordless) via `@simplewebauthn/browser` (client) and `@simplewebauthn/server` (backend):
-- Login page: `/login`
+Primary login is WebAuthn (security keys, Touch ID, Windows Hello) via `@simplewebauthn/browser` (client) and `@simplewebauthn/server` (backend). A password toggle on the login page falls back to `POST /api/admin/auth/login` (bcrypt) for devices that can't use WebAuthn.
+
+- Login page: `/login` — defaults to WebAuthn; "Use password instead" toggle reveals password input
 - Auth middleware: `app/middleware/auth.ts` — guards all protected routes
-- Auth store: `app/stores/auth.ts`
-- CSRF protection: `useCsrf` composable
-- Client rate limiting: `useRateLimit` (5 attempts / minute, 5-minute lockout)
+- Auth store: `app/stores/auth.ts` — `loginWithSecurityKey()`, `loginWithPassword()`, `checkSession()`, `logout()`
+- CSRF protection: `useCsrf` composable (token on every mutating request, rotated on login)
+- Client rate limiting: `useRateLimit` (5 attempts / minute, 5-minute lockout; shared bucket for both login modes)
 - Supabase backed: `useSupabaseAdmin` composable
-- Backend routes: `backend/src/routes/admin/webauthn.js`, `backend/src/routes/admin/auth.js`
+- Backend routes: `backend/src/routes/admin/webauthn.js` (WebAuthn), `backend/src/routes/admin/auth.js` (password + session)
 - CSP headers configured in `nuxt.config.ts` to prevent XSS
 
 ### User Frontend — Supabase OAuth
@@ -401,8 +403,8 @@ Key variables (see `.env.example` for full list):
 | `NUXT_PUBLIC_SUPABASE_KEY` | Supabase anon key |
 | `SUPABASE_SECRET_KEY` | Supabase service role key (admin only — never expose client) |
 | `NUXT_PUBLIC_SITE_URL` | Public site URL (canonical links, OG, sitemap) |
-| `NUXT_PUBLIC_API_BASE` | Backend API base, exposed to Nuxt runtime (frontends) |
-| `API_BASE_URL` | Backend API base for server-side / admin (default: `http://localhost:3001`) |
+| `NUXT_PUBLIC_API_BASE` | Backend API base — set this in both frontends; exposed via Nuxt runtime config (`useRuntimeConfig().public.apiBase`) |
+| `API_BASE_URL` | Backend API base for server-side / backend-internal use (default: `http://localhost:3001`); not visible to the browser |
 | `DATABASE_URL` | PostgreSQL connection string for Prisma |
 | `REDIS_URL` / `REDIS_PASSWORD` | Redis connection (default password: `dev_redis_password`) |
 | `SESSION_SECRET` | Backend session secret (32+ chars; required in production) |
