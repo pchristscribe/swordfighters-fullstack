@@ -13,16 +13,12 @@ export async function adminAuth(request, reply) {
   }
 
   // Verify admin still exists and is active
-  const admin = await request.server.prisma.admin.findUnique({
-    where: { id: request.session.adminId },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isActive: true
-    }
-  });
+  const { sql } = request.server;
+  const [admin] = await sql`
+    select id, email, name, role, is_active
+    from admins
+    where id = ${request.session.adminId}
+  `;
 
   if (!admin || !admin.isActive) {
     // Clear invalid session

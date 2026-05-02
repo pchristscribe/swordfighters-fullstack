@@ -1,7 +1,60 @@
-export default async function productRoutes(fastify, options) {
-  const { prisma, redis } = fastify;
+const SORTABLE = {
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  price: 'price',
+  rating: 'rating',
+  reviewCount: 'review_count',
+  title: 'title'
+};
 
-  // Get all products with filtering and pagination
+async function attachRelations(sql, products, { latestLinkOnly = false } = {}) {
+  if (products.length === 0) return products;
+
+  const categoryIds = [...new Set(products.map(p => p.categoryId).filter(Boolean))];
+  const productIds = products.map(p => p.id);
+
+  const linksQuery = latestLinkOnly
+    ? sql`
+        select distinct on (product_id) *
+        from affiliate_links
+        where product_id in ${sql(productIds)}
+        order by product_id, created_at desc
+      `
+    : sql`select * from affiliate_links where product_id in ${sql(productIds)}`;
+
+  const [categories, links, reviewCounts] = await Promise.all([
+    categoryIds.length
+      ? sql`select * from categories where id in ${sql(categoryIds)}`
+      : Promise.resolve([]),
+    linksQuery,
+    sql`
+      select product_id, count(*)::int as count
+      from reviews
+      where product_id in ${sql(productIds)}
+      group by product_id
+    `
+  ]);
+
+  const catMap = new Map(categories.map(c => [c.id, c]));
+  const linksMap = new Map();
+  for (const link of links) {
+    if (!linksMap.has(link.productId)) linksMap.set(link.productId, []);
+    linksMap.get(link.productId).push(link);
+  }
+  const countMap = new Map(reviewCounts.map(r => [r.productId, r.count]));
+
+  return products.map(p => ({
+    ...p,
+    category: catMap.get(p.categoryId) || null,
+    affiliateLinks: linksMap.get(p.id) || [],
+    _count: { reviews: countMap.get(p.id) || 0 }
+  }));
+}
+
+export default async function productRoutes(fastify, options) {
+  const { sql, redis } = fastify;
+
+  // List products with filtering and pagination
   fastify.get('/', async (request, reply) => {
     const {
       platform,
@@ -16,57 +69,45 @@ export default async function productRoutes(fastify, options) {
     } = request.query;
 
     const skip = (page - 1) * limit;
-    const where = { status };
+    const sortColumn = SORTABLE[sortBy] || 'created_at';
+    const sortOrder = order === 'asc' ? sql`asc` : sql`desc`;
 
-    if (platform) where.platform = platform;
-    if (categoryId) where.categoryId = categoryId;
-    if (minPrice || maxPrice) {
-      where.price = {};
-      if (minPrice) where.price.gte = parseFloat(minPrice);
-      if (maxPrice) where.price.lte = parseFloat(maxPrice);
-    }
+    const conditions = [sql`status = ${status}`];
+    if (platform) conditions.push(sql`platform = ${platform}`);
+    if (categoryId) conditions.push(sql`category_id = ${categoryId}`);
+    if (minPrice) conditions.push(sql`price >= ${parseFloat(minPrice)}`);
+    if (maxPrice) conditions.push(sql`price <= ${parseFloat(maxPrice)}`);
 
-    // Create a cache key from the query parameters
+    const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`);
+
     const cacheKey = `products:list:${JSON.stringify(request.query)}`;
-
-    // Check if we have cached results
     const cached = await redis.get(cacheKey);
     if (cached) {
-      return JSON.parse(cached); // Return cached data immediately
+      return JSON.parse(cached);
     }
 
-    // If no cache, fetch from database
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        orderBy: { [sortBy]: order },
-        include: {
-          category: true,
-          affiliateLinks: {
-            take: 1,
-            orderBy: { createdAt: 'desc' }
-          },
-          _count: {
-            select: { reviews: true }
-          }
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
+    const products = await sql`
+      select * from products
+      where ${whereClause}
+      order by ${sql(sortColumn)} ${sortOrder}
+      limit ${parseInt(limit)}
+      offset ${skip}
+    `;
+
+    const [{ count: total }] = await sql`
+      select count(*)::int as count from products where ${whereClause}
+    `;
 
     const result = {
-      products,
+      products: await attachRelations(sql, products, { latestLinkOnly: true }),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit),
-      },
+        pages: Math.ceil(total / limit)
+      }
     };
 
-    // Cache the result for 5 minutes (300 seconds)
     await redis.setex(cacheKey, 300, JSON.stringify(result));
 
     return result;
@@ -76,34 +117,37 @@ export default async function productRoutes(fastify, options) {
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params;
 
-    // Try cache first
     const cached = await redis.get(`product:${id}`);
     if (cached) {
       return JSON.parse(cached);
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        affiliateLinks: true,
-        reviews: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
+    const [product] = await sql`select * from products where id = ${id}`;
 
     if (!product) {
       reply.code(404);
       return { error: 'Product not found' };
     }
 
-    // Cache for 1 hour
-    await redis.setex(`product:${id}`, 3600, JSON.stringify(product));
+    const [[category], links, reviews] = await Promise.all([
+      product.categoryId
+        ? sql`select * from categories where id = ${product.categoryId}`
+        : Promise.resolve([null]),
+      sql`select * from affiliate_links where product_id = ${id}`,
+      sql`select * from reviews where product_id = ${id} order by created_at desc`
+    ]);
 
-    return product;
+    const result = {
+      ...product,
+      category: category || null,
+      affiliateLinks: links,
+      reviews
+    };
+
+    await redis.setex(`product:${id}`, 3600, JSON.stringify(result));
+
+    return result;
   });
 
-  // Write operations (POST, PATCH, DELETE) are only available through admin routes
-  // See: backend/src/routes/admin/products.js for authenticated admin endpoints
+  // Write operations live in backend/src/routes/admin/products.js
 }
