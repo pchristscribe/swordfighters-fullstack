@@ -1,12 +1,90 @@
 import { adminAuth } from '../../middleware/adminAuth.js';
 
-export default async function adminProductRoutes(fastify, options) {
-  const { prisma, redis } = fastify;
+const SORTABLE = {
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  price: 'price',
+  rating: 'rating',
+  reviewCount: 'review_count',
+  title: 'title',
+  priceUpdatedAt: 'price_updated_at'
+};
 
-  // Apply auth middleware to all routes
+const PRODUCT_FIELDS = [
+  'externalId', 'platform', 'title', 'description', 'imageUrl', 'price',
+  'currency', 'status', 'categoryId', 'rating', 'reviewCount', 'tags', 'metadata'
+];
+
+const TO_COLUMN = {
+  externalId: 'external_id',
+  imageUrl: 'image_url',
+  categoryId: 'category_id',
+  reviewCount: 'review_count'
+};
+
+const toColumn = (key) => TO_COLUMN[key] || key;
+
+async function attachRelations(sql, products) {
+  if (products.length === 0) return products;
+
+  const categoryIds = [...new Set(products.map(p => p.categoryId).filter(Boolean))];
+  const productIds = products.map(p => p.id);
+
+  const [categories, links, reviewCounts] = await Promise.all([
+    categoryIds.length
+      ? sql`select * from categories where id in ${sql(categoryIds)}`
+      : Promise.resolve([]),
+    sql`select * from affiliate_links where product_id in ${sql(productIds)}`,
+    sql`
+      select product_id, count(*)::int as count
+      from reviews
+      where product_id in ${sql(productIds)}
+      group by product_id
+    `
+  ]);
+
+  const catMap = new Map(categories.map(c => [c.id, c]));
+  const linksMap = new Map();
+  for (const link of links) {
+    if (!linksMap.has(link.productId)) linksMap.set(link.productId, []);
+    linksMap.get(link.productId).push(link);
+  }
+  const countMap = new Map(reviewCounts.map(r => [r.productId, r.count]));
+
+  return products.map(p => ({
+    ...p,
+    category: catMap.get(p.categoryId) || null,
+    affiliateLinks: linksMap.get(p.id) || [],
+    _count: { reviews: countMap.get(p.id) || 0 }
+  }));
+}
+
+async function loadProductFull(sql, id) {
+  const [product] = await sql`select * from products where id = ${id}`;
+  if (!product) return null;
+
+  const [[category], links, reviews] = await Promise.all([
+    product.categoryId
+      ? sql`select * from categories where id = ${product.categoryId}`
+      : Promise.resolve([null]),
+    sql`select * from affiliate_links where product_id = ${id}`,
+    sql`select * from reviews where product_id = ${id} order by created_at desc`
+  ]);
+
+  return {
+    ...product,
+    category: category || null,
+    affiliateLinks: links,
+    reviews
+  };
+}
+
+export default async function adminProductRoutes(fastify, options) {
+  const { sql, redis } = fastify;
+
   fastify.addHook('onRequest', adminAuth);
 
-  // Get all products (admin view with more details)
+  // List products
   fastify.get('/', async (request, reply) => {
     const {
       platform,
@@ -20,87 +98,87 @@ export default async function adminProductRoutes(fastify, options) {
     } = request.query;
 
     const skip = (page - 1) * limit;
-    const where = {};
+    const sortColumn = SORTABLE[sortBy] || 'created_at';
+    const sortOrder = order === 'asc' ? sql`asc` : sql`desc`;
+    const searchPattern = search ? `%${search}%` : null;
 
-    if (platform) where.platform = platform;
-    if (categoryId) where.categoryId = categoryId;
-    if (status) where.status = status;
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { externalId: { contains: search } }
-      ];
+    const conditions = [];
+    if (platform) conditions.push(sql`platform = ${platform}`);
+    if (categoryId) conditions.push(sql`category_id = ${categoryId}`);
+    if (status) conditions.push(sql`status = ${status}`);
+    if (searchPattern) {
+      conditions.push(sql`(
+        title ilike ${searchPattern}
+        or description ilike ${searchPattern}
+        or external_id ilike ${searchPattern}
+      )`);
     }
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        orderBy: { [sortBy]: order },
-        include: {
-          category: true,
-          affiliateLinks: true,
-          _count: {
-            select: { reviews: true }
-          }
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
+    const whereClause = conditions.length === 0
+      ? sql`true`
+      : conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`);
+
+    const products = await sql`
+      select * from products
+      where ${whereClause}
+      order by ${sql(sortColumn)} ${sortOrder}
+      limit ${parseInt(limit)}
+      offset ${skip}
+    `;
+
+    const [{ count: total }] = await sql`
+      select count(*)::int as count from products where ${whereClause}
+    `;
 
     return {
-      products,
+      products: await attachRelations(sql, products),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit),
-      },
+        pages: Math.ceil(total / limit)
+      }
     };
   });
 
-  // Get single product by ID
+  // Get single product
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params;
-
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        affiliateLinks: true,
-        reviews: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
-
+    const product = await loadProductFull(sql, id);
     if (!product) {
       reply.code(404);
       return { error: 'Product not found' };
     }
-
     return product;
   });
 
-  // Create new product
+  // Create product
   fastify.post('/', async (request, reply) => {
-    try {
-      const product = await prisma.product.create({
-        data: request.body,
-        include: {
-          category: true,
-        },
-      });
+    const data = request.body;
+    const insertObj = Object.fromEntries(
+      PRODUCT_FIELDS
+        .filter(k => data[k] !== undefined)
+        .map(k => [toColumn(k), data[k]])
+    );
 
-      // Invalidate cache
+    try {
+      const [created] = await sql`
+        insert into products ${sql(insertObj)}
+        returning *
+      `;
+
+      const [[category]] = await Promise.all([
+        created.categoryId
+          ? sql`select * from categories where id = ${created.categoryId}`
+          : Promise.resolve([null])
+      ]);
+
       await redis.del('products:list:*');
 
       reply.code(201);
-      return product;
+      return { ...created, category: category || null };
     } catch (error) {
-      if (error.code === 'P2002') {
+      if (error.code === '23505') {
         reply.code(409);
         return {
           error: 'Conflict',
@@ -114,53 +192,67 @@ export default async function adminProductRoutes(fastify, options) {
   // Update product
   fastify.patch('/:id', async (request, reply) => {
     const { id } = request.params;
+    const data = request.body;
+    const updateObj = Object.fromEntries(
+      PRODUCT_FIELDS
+        .filter(k => data[k] !== undefined)
+        .map(k => [toColumn(k), data[k]])
+    );
 
-    try {
-      const product = await prisma.product.update({
-        where: { id },
-        data: request.body,
-        include: {
-          category: true,
-          affiliateLinks: true,
-        },
-      });
-
-      // Invalidate cache
-      await redis.del(`product:${id}`);
-      await redis.del('products:list:*');
-
-      return product;
-    } catch (error) {
-      if (error.code === 'P2025') {
+    if (Object.keys(updateObj).length === 0) {
+      const product = await loadProductFull(sql, id);
+      if (!product) {
         reply.code(404);
         return { error: 'Product not found' };
       }
-      throw error;
+      return product;
     }
+
+    const [updated] = await sql`
+      update products
+      set ${sql(updateObj)}
+      where id = ${id}
+      returning *
+    `;
+
+    if (!updated) {
+      reply.code(404);
+      return { error: 'Product not found' };
+    }
+
+    const [[category], links] = await Promise.all([
+      updated.categoryId
+        ? sql`select * from categories where id = ${updated.categoryId}`
+        : Promise.resolve([null]),
+      sql`select * from affiliate_links where product_id = ${id}`
+    ]);
+
+    await redis.del(`product:${id}`);
+    await redis.del('products:list:*');
+
+    return {
+      ...updated,
+      category: category || null,
+      affiliateLinks: links
+    };
   });
 
   // Delete product
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params;
 
-    try {
-      await prisma.product.delete({
-        where: { id },
-      });
+    const result = await sql`delete from products where id = ${id}`;
 
-      // Invalidate cache
-      await redis.del(`product:${id}`);
-      await redis.del('products:list:*');
-
-      reply.code(204);
-      return;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        reply.code(404);
-        return { error: 'Product not found' };
-      }
-      throw error;
+    if (result.count === 0) {
+      reply.code(404);
+      return { error: 'Product not found' };
     }
+
+    await redis.del(`product:${id}`);
+    await redis.del('products:list:*');
+
+    reply.code(204);
+    return;
   });
 
   // Bulk update status
@@ -177,14 +269,12 @@ export default async function adminProductRoutes(fastify, options) {
       return { error: 'Invalid status value' };
     }
 
-    const result = await prisma.product.updateMany({
-      where: {
-        id: { in: productIds }
-      },
-      data: { status }
-    });
+    const result = await sql`
+      update products
+      set status = ${status}
+      where id in ${sql(productIds)}
+    `;
 
-    // Invalidate cache
     await redis.del('products:list:*');
     for (const id of productIds) {
       await redis.del(`product:${id}`);
@@ -205,13 +295,10 @@ export default async function adminProductRoutes(fastify, options) {
       return { error: 'productIds array is required' };
     }
 
-    const result = await prisma.product.deleteMany({
-      where: {
-        id: { in: productIds }
-      }
-    });
+    const result = await sql`
+      delete from products where id in ${sql(productIds)}
+    `;
 
-    // Invalidate cache
     await redis.del('products:list:*');
     for (const id of productIds) {
       await redis.del(`product:${id}`);
@@ -223,29 +310,22 @@ export default async function adminProductRoutes(fastify, options) {
     };
   });
 
-  // Get dashboard stats
+  // Dashboard stats
   fastify.get('/stats/dashboard', async (request, reply) => {
     const [
-      totalProducts,
-      activeProducts,
-      outOfStock,
-      totalCategories,
-      totalReviews,
+      [{ count: totalProducts }],
+      [{ count: activeProducts }],
+      [{ count: outOfStock }],
+      [{ count: totalCategories }],
+      [{ count: totalReviews }],
       recentProducts
     ] = await Promise.all([
-      prisma.product.count(),
-      prisma.product.count({ where: { status: 'ACTIVE' } }),
-      prisma.product.count({ where: { status: 'OUT_OF_STOCK' } }),
-      prisma.category.count(),
-      prisma.review.count(),
-      prisma.product.findMany({
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          category: true,
-          _count: { select: { reviews: true } }
-        }
-      })
+      sql`select count(*)::int as count from products`,
+      sql`select count(*)::int as count from products where status = 'ACTIVE'`,
+      sql`select count(*)::int as count from products where status = 'OUT_OF_STOCK'`,
+      sql`select count(*)::int as count from categories`,
+      sql`select count(*)::int as count from reviews`,
+      sql`select * from products order by created_at desc limit 5`
     ]);
 
     return {
@@ -257,7 +337,7 @@ export default async function adminProductRoutes(fastify, options) {
         totalCategories,
         totalReviews
       },
-      recentProducts
+      recentProducts: await attachRelations(sql, recentProducts)
     };
   });
 }

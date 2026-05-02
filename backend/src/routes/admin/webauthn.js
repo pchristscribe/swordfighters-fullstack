@@ -18,40 +18,28 @@ const ORIGIN = process.env.NODE_ENV === 'production'
 // Email validation regex - RFC 5322 simplified
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/**
- * Validates and sanitizes email input
- * @param {any} email - The email input to validate
- * @returns {{ valid: boolean, email?: string, error?: string }}
- */
 function validateEmail(email) {
-  // Type check - must be a string
   if (typeof email !== 'string') {
     return { valid: false, error: 'Email must be a string' }
   }
 
-  // Trim whitespace
   const trimmed = email.trim()
 
-  // Empty check (handles whitespace-only inputs)
   if (trimmed.length === 0) {
     return { valid: false, error: 'Email is required' }
   }
 
-  // Length limits (prevent DoS with extremely long emails)
   if (trimmed.length > 254) {
     return { valid: false, error: 'Email is too long' }
   }
 
-  // Format validation
   if (!EMAIL_REGEX.test(trimmed)) {
     return { valid: false, error: 'Invalid email format' }
   }
 
-  // Normalize to lowercase
   return { valid: true, email: trimmed.toLowerCase() }
 }
 
-// JSON Schema definitions for Fastify validation
 const registerOptionsSchema = {
   body: {
     type: 'object',
@@ -100,10 +88,18 @@ const authenticateVerifySchema = {
   }
 }
 
-export default async function webauthnRoutes(fastify, options) {
-  const { prisma } = fastify
+async function loadAdminByEmail(sql, email) {
+  const [admin] = await sql`select * from admins where email = ${email}`
+  if (!admin) return null
+  const credentials = await sql`
+    select * from webauthn_credentials where admin_id = ${admin.id}
+  `
+  return { ...admin, webauthnCredentials: credentials }
+}
 
-  // Custom error handler for schema validation errors
+export default async function webauthnRoutes(fastify, options) {
+  const { sql } = fastify
+
   fastify.setErrorHandler((error, request, reply) => {
     if (error.validation) {
       reply.code(400).send({
@@ -112,16 +108,14 @@ export default async function webauthnRoutes(fastify, options) {
       })
       return
     }
-    // Re-throw other errors to default handler
     throw error
   })
 
-  // Step 1: Generate registration options (called when admin wants to add a security key)
+  // Step 1: Generate registration options
   fastify.post('/register/options', { schema: registerOptionsSchema }, async (request, reply) => {
     try {
       fastify.log.info('Registration options request received')
 
-      // Validate and sanitize email (Bug #1, #2, #3 fixes)
       const emailValidation = validateEmail(request.body.email)
       if (!emailValidation.valid) {
         fastify.log.warn({ error: emailValidation.error }, 'Registration options: Invalid email')
@@ -132,37 +126,30 @@ export default async function webauthnRoutes(fastify, options) {
       const email = emailValidation.email
       fastify.log.info({ email }, 'Looking up admin by email')
 
-      // Find or create admin
-      let admin = await prisma.admin.findUnique({
-        where: { email },
-        include: {
-          webauthnCredentials: true
-        }
-      })
+      let admin = await loadAdminByEmail(sql, email)
 
       if (!admin) {
         fastify.log.info({ email }, 'Creating new admin')
-        // Create new admin (they'll register their first credential)
-        admin = await prisma.admin.create({
-          data: {
+        const [created] = await sql`
+          insert into admins ${sql({
             email,
             name: email.split('@')[0],
             role: 'admin',
-            isActive: true
-          },
-          include: {
-            webauthnCredentials: true
-          }
-        })
+            is_active: true
+          })}
+          returning *
+        `
+        admin = { ...created, webauthnCredentials: [] }
         fastify.log.info({ adminId: admin.id }, 'Admin created successfully')
       } else {
-        fastify.log.info({ adminId: admin.id, credentialCount: admin.webauthnCredentials.length }, 'Admin found')
+        fastify.log.info(
+          { adminId: admin.id, credentialCount: admin.webauthnCredentials.length },
+          'Admin found'
+        )
       }
 
-      // Convert string ID to Uint8Array as required by SimpleWebAuthn v9+
       const userIdBuffer = new TextEncoder().encode(admin.id)
 
-      // Filter out any credentials with invalid credential IDs
       const validCredentials = admin.webauthnCredentials.filter(
         cred => cred.credentialId && typeof cred.credentialId === 'string' && cred.credentialId.length > 0
       )
@@ -188,21 +175,18 @@ export default async function webauthnRoutes(fastify, options) {
         authenticatorSelection: {
           residentKey: 'preferred',
           userVerification: 'preferred'
-          // No authenticatorAttachment - allows both platform (TouchID) and cross-platform (YubiKey)
         }
       })
 
       fastify.log.info({ challengeLength: registrationOptions.challenge.length }, 'Storing challenge')
 
-      // Store challenge in admin record with 5-minute expiration
-      const challengeExpiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-      await prisma.admin.update({
-        where: { id: admin.id },
-        data: {
-          currentChallenge: registrationOptions.challenge,
-          challengeExpiresAt
-        }
-      })
+      const challengeExpiresAt = new Date(Date.now() + 5 * 60 * 1000)
+      await sql`
+        update admins
+        set current_challenge = ${registrationOptions.challenge},
+            challenge_expires_at = ${challengeExpiresAt}
+        where id = ${admin.id}
+      `
 
       fastify.log.info('Registration options generated successfully')
       return registrationOptions
@@ -223,7 +207,6 @@ export default async function webauthnRoutes(fastify, options) {
   // Step 2: Verify registration response and store credential
   fastify.post('/register/verify', { schema: registerVerifySchema }, async (request, reply) => {
     try {
-      // Validate and sanitize email (Bug #1, #2, #3 fixes)
       const emailValidation = validateEmail(request.body.email)
       if (!emailValidation.valid) {
         reply.code(400)
@@ -233,22 +216,18 @@ export default async function webauthnRoutes(fastify, options) {
       const email = emailValidation.email
       const { credential, deviceName } = request.body
 
-      // Validate credential object
       if (!credential || typeof credential !== 'object') {
         reply.code(400)
         return { error: 'Valid credential object is required' }
       }
 
-      const admin = await prisma.admin.findUnique({
-        where: { email }
-      })
+      const [admin] = await sql`select * from admins where email = ${email}`
 
       if (!admin || !admin.currentChallenge) {
         reply.code(400)
         return { error: 'Invalid registration session' }
       }
 
-      // Check if challenge has expired
       if (!isValidChallenge(admin)) {
         reply.code(400)
         return { error: 'Registration challenge has expired. Please try again.' }
@@ -266,9 +245,8 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'Verification failed' }
       }
 
-      const { credential: credentialData, credentialDeviceType, credentialBackedUp } = verification.registrationInfo
+      const { credential: credentialData } = verification.registrationInfo
 
-      // Log for debugging
       fastify.log.info({
         registrationInfo: verification.registrationInfo,
         credentialId: credential.id,
@@ -280,8 +258,6 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'Missing credential data' }
       }
 
-      // In SimpleWebAuthn v13+, credential.id from the request is already base64url
-      // This matches what we'll receive during authentication
       const credentialId = credential.id
 
       if (!credentialId || credentialId.length === 0) {
@@ -290,31 +266,27 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'Missing credential ID' }
       }
 
-      // Sanitize device name (Bug fix: prevent XSS and limit length)
       const sanitizedDeviceName = typeof deviceName === 'string'
         ? deviceName.trim().slice(0, 100) || 'Security Key'
         : 'Security Key'
 
-      // Store the credential (counter defaults to 0 if undefined)
-      await prisma.webAuthnCredential.create({
-        data: {
-          adminId: admin.id,
-          credentialId: credentialId,  // Use credential.id directly
-          publicKey: isoBase64URL.fromBuffer(credentialData.publicKey),
+      await sql`
+        insert into webauthn_credentials ${sql({
+          admin_id: admin.id,
+          credential_id: credentialId,
+          public_key: isoBase64URL.fromBuffer(credentialData.publicKey),
           counter: BigInt(credentialData.counter ?? 0),
-          deviceName: sanitizedDeviceName,
+          device_name: sanitizedDeviceName,
           transports: credential.response?.transports || []
-        }
-      })
+        })}
+      `
 
-      // Clear challenge and expiration
-      await prisma.admin.update({
-        where: { id: admin.id },
-        data: {
-          currentChallenge: null,
-          challengeExpiresAt: null
-        }
-      })
+      await sql`
+        update admins
+        set current_challenge = null,
+            challenge_expires_at = null
+        where id = ${admin.id}
+      `
 
       return {
         verified: true,
@@ -322,7 +294,6 @@ export default async function webauthnRoutes(fastify, options) {
       }
     } catch (error) {
       fastify.log.error(error)
-      // Don't expose internal error details to client
       reply.code(400)
       return {
         error: 'Registration verification failed',
@@ -336,7 +307,6 @@ export default async function webauthnRoutes(fastify, options) {
     try {
       fastify.log.info('Authentication options request received')
 
-      // Validate and sanitize email (Bug #1, #2, #3 fixes)
       const emailValidation = validateEmail(request.body.email)
       if (!emailValidation.valid) {
         fastify.log.warn({ error: emailValidation.error }, 'Authentication options: Invalid email')
@@ -347,12 +317,7 @@ export default async function webauthnRoutes(fastify, options) {
       const email = emailValidation.email
       fastify.log.info({ email }, 'Looking up admin for authentication')
 
-      const admin = await prisma.admin.findUnique({
-        where: { email },
-        include: {
-          webauthnCredentials: true
-        }
-      })
+      const admin = await loadAdminByEmail(sql, email)
 
       if (!admin) {
         fastify.log.warn({ email }, 'Admin not found')
@@ -372,7 +337,6 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'No security keys registered. Please register a key first.' }
       }
 
-      // Filter out any credentials with invalid credential IDs
       const validCredentials = admin.webauthnCredentials.filter(
         cred => cred.credentialId && typeof cred.credentialId === 'string' && cred.credentialId.length > 0
       )
@@ -395,15 +359,13 @@ export default async function webauthnRoutes(fastify, options) {
 
       fastify.log.info({ challengeLength: authOptions.challenge.length }, 'Storing authentication challenge')
 
-      // Store challenge with 5-minute expiration
-      const challengeExpiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-      await prisma.admin.update({
-        where: { id: admin.id },
-        data: {
-          currentChallenge: authOptions.challenge,
-          challengeExpiresAt
-        }
-      })
+      const challengeExpiresAt = new Date(Date.now() + 5 * 60 * 1000)
+      await sql`
+        update admins
+        set current_challenge = ${authOptions.challenge},
+            challenge_expires_at = ${challengeExpiresAt}
+        where id = ${admin.id}
+      `
 
       fastify.log.info('Authentication options generated successfully')
       return authOptions
@@ -424,7 +386,6 @@ export default async function webauthnRoutes(fastify, options) {
   // Step 4: Verify authentication response and log in
   fastify.post('/authenticate/verify', { schema: authenticateVerifySchema }, async (request, reply) => {
     try {
-      // Validate and sanitize email (Bug #1, #2, #3 fixes)
       const emailValidation = validateEmail(request.body.email)
       if (!emailValidation.valid) {
         reply.code(400)
@@ -434,32 +395,23 @@ export default async function webauthnRoutes(fastify, options) {
       const email = emailValidation.email
       const { credential } = request.body
 
-      // Validate credential object
       if (!credential || typeof credential !== 'object') {
         reply.code(400)
         return { error: 'Valid credential object is required' }
       }
 
-      const admin = await prisma.admin.findUnique({
-        where: { email },
-        include: {
-          webauthnCredentials: true
-        }
-      })
+      const admin = await loadAdminByEmail(sql, email)
 
       if (!admin || !admin.currentChallenge) {
         reply.code(400)
         return { error: 'Invalid authentication session' }
       }
 
-      // Check if challenge has expired
       if (!isValidChallenge(admin)) {
         reply.code(400)
         return { error: 'Authentication challenge has expired. Please try again.' }
       }
 
-      // Find the credential being used
-      // In SimpleWebAuthn v9+, credential.id is already a base64url string
       const credentialId = credential.id
       const dbCredential = admin.webauthnCredentials.find(
         cred => cred.credentialId === credentialId
@@ -492,26 +444,22 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'Authentication failed' }
       }
 
-      // Update counter and last used (counter defaults to current value if newCounter is undefined)
-      await prisma.webAuthnCredential.update({
-        where: { id: dbCredential.id },
-        data: {
-          counter: BigInt(verification.authenticationInfo.newCounter ?? dbCredential.counter),
-          lastUsedAt: new Date()
-        }
-      })
+      const newCounter = BigInt(verification.authenticationInfo.newCounter ?? Number(dbCredential.counter))
+      await sql`
+        update webauthn_credentials
+        set counter = ${newCounter},
+            last_used_at = ${new Date()}
+        where id = ${dbCredential.id}
+      `
 
-      // Update admin last login and clear challenge
-      await prisma.admin.update({
-        where: { id: admin.id },
-        data: {
-          lastLoginAt: new Date(),
-          currentChallenge: null,
-          challengeExpiresAt: null
-        }
-      })
+      await sql`
+        update admins
+        set last_login_at = ${new Date()},
+            current_challenge = null,
+            challenge_expires_at = null
+        where id = ${admin.id}
+      `
 
-      // Set session
       request.session.adminId = admin.id
 
       return {
@@ -525,7 +473,6 @@ export default async function webauthnRoutes(fastify, options) {
       }
     } catch (error) {
       fastify.log.error(error)
-      // Don't expose internal error details to client
       reply.code(401)
       return {
         error: 'Authentication failed',
@@ -541,17 +488,12 @@ export default async function webauthnRoutes(fastify, options) {
       return { error: 'Not authenticated' }
     }
 
-    const credentials = await prisma.webAuthnCredential.findMany({
-      where: { adminId: request.session.adminId },
-      select: {
-        id: true,
-        deviceName: true,
-        transports: true,
-        lastUsedAt: true,
-        createdAt: true
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    const credentials = await sql`
+      select id, device_name, transports, last_used_at, created_at
+      from webauthn_credentials
+      where admin_id = ${request.session.adminId}
+      order by created_at desc
+    `
 
     return { credentials }
   })
@@ -565,38 +507,35 @@ export default async function webauthnRoutes(fastify, options) {
 
     const { id } = request.params
 
-    // Validate id parameter (prevent injection)
     if (!id || typeof id !== 'string' || id.trim().length === 0) {
       reply.code(400)
       return { error: 'Valid credential ID is required' }
     }
 
-    // Make sure they own this credential
-    const credential = await prisma.webAuthnCredential.findFirst({
-      where: {
-        id: id.trim(),
-        adminId: request.session.adminId
-      }
-    })
+    const trimmedId = id.trim()
+
+    const [credential] = await sql`
+      select id from webauthn_credentials
+      where id = ${trimmedId} and admin_id = ${request.session.adminId}
+    `
 
     if (!credential) {
       reply.code(404)
       return { error: 'Credential not found' }
     }
 
-    // Don't allow deleting the last credential
-    const count = await prisma.webAuthnCredential.count({
-      where: { adminId: request.session.adminId }
-    })
+    const [{ count }] = await sql`
+      select count(*)::int as count
+      from webauthn_credentials
+      where admin_id = ${request.session.adminId}
+    `
 
     if (count === 1) {
       reply.code(400)
       return { error: 'Cannot delete your last security key' }
     }
 
-    await prisma.webAuthnCredential.delete({
-      where: { id: id.trim() }
-    })
+    await sql`delete from webauthn_credentials where id = ${trimmedId}`
 
     return { success: true }
   })
