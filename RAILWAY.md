@@ -64,15 +64,15 @@ Nuxt's Nitro server binds to `0.0.0.0:$PORT` automatically on Railway.
 
 Each `railway.json` sets:
 
-- **Backend** — build: `npm ci && npx prisma generate`, start: `node src/index.js`
+- **Backend** — build: `npm ci`, start: `node src/index.js`
 - **Frontend / Admin Frontend** — build: `npm ci && npm run build`, start: `node .output/server/index.mjs`
 
 ## Database migrations
 
-Prisma migrations are not applied automatically by the deploy step. Run them from a Railway shell or a one-off job:
+The backend uses [`postgres-js`](https://github.com/porsager/postgres) directly against Supabase Postgres. Schema changes live in `supabase/migrations/` and are applied via the Supabase CLI (see `scripts/migrate.sh`):
 
 ```bash
-npx prisma migrate deploy
+SUPABASE_ACCESS_TOKEN=… SUPABASE_PROJECT_REF=… ./scripts/migrate.sh
 ```
 
-Add this to the backend service's build command (`npm ci && npx prisma generate && npx prisma migrate deploy`) only once the project is stable enough that every deploy should migrate.
+This is intentionally a separate step from the Railway deploy — migrations should be reviewed and applied deliberately rather than running on every push.

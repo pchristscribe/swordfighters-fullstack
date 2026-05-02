@@ -7,13 +7,34 @@ import {
   bulkDeleteCategoriesSchema
 } from '../../schemas/category.js'
 
+// Allowlist for sortBy → DB column mapping. Anything not in this map
+// falls back to `name` so the ORDER BY can never be user-controlled SQL.
+const SORTABLE = {
+  name: 'name',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+}
+
+const CATEGORY_INSERT_FIELDS = ['name', 'slug', 'description', 'imageUrl']
+const TO_COLUMN = {
+  imageUrl: 'image_url'
+}
+
+const toColumn = (key) => TO_COLUMN[key] || key
+
+// Reshape `productCount` (from a subquery) into `_count: { products: N }`
+// for API compatibility with the previous Prisma response shape.
+function withCountShape(row) {
+  const { productCount, ...rest } = row
+  return { ...rest, _count: { products: Number(productCount ?? 0) } }
+}
+
 export default async function adminCategoryRoutes(fastify, options) {
-  const { prisma } = fastify;
+  const { sql } = fastify
 
-  // Apply auth middleware to all routes
-  fastify.addHook('onRequest', adminAuth);
+  fastify.addHook('onRequest', adminAuth)
 
-  // Get all categories
+  // List categories
   fastify.get('/', { schema: listCategoriesSchema }, async (request, reply) => {
     const {
       search,
@@ -24,159 +45,178 @@ export default async function adminCategoryRoutes(fastify, options) {
     } = request.query
 
     const skip = (page - 1) * limit
-    const where = {}
+    const sortColumn = SORTABLE[sortBy] || 'name'
+    const sortOrder = order === 'desc' ? sql`desc` : sql`asc`
+    const searchPattern = search ? `%${search}%` : null
 
-    // Search functionality
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ]
-    }
+    const whereClause = searchPattern === null
+      ? sql`true`
+      : sql`(c.name ilike ${searchPattern} or c.description ilike ${searchPattern})`
 
-    const [categories, total] = await Promise.all([
-      prisma.category.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        orderBy: { [sortBy]: order },
-        include: {
-          _count: {
-            select: { products: true }
-          }
-        }
-      }),
-      prisma.category.count({ where })
-    ])
+    const rows = await sql`
+      select
+        c.*,
+        (select count(*)::int from products p where p.category_id = c.id) as product_count
+      from categories c
+      where ${whereClause}
+      order by ${sql(sortColumn)} ${sortOrder}
+      limit ${parseInt(limit)}
+      offset ${skip}
+    `
+
+    const [{ count }] = await sql`
+      select count(*)::int as count
+      from categories c
+      where ${whereClause}
+    `
 
     return {
-      categories,
+      categories: rows.map(withCountShape),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
+        total: count,
+        pages: Math.ceil(count / limit)
       }
     }
-  });
+  })
 
   // Get single category
   fastify.get('/:id', async (request, reply) => {
-    const { id } = request.params;
+    const { id } = request.params
 
-    const category = await prisma.category.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: { products: true }
-        }
-      }
-    });
+    const [row] = await sql`
+      select
+        c.*,
+        (select count(*)::int from products p where p.category_id = c.id) as product_count
+      from categories c
+      where c.id = ${id}
+    `
 
-    if (!category) {
-      reply.code(404);
-      return { error: 'Category not found' };
+    if (!row) {
+      reply.code(404)
+      return { error: 'Category not found' }
     }
 
-    return category;
-  });
+    return withCountShape(row)
+  })
 
   // Create category
   fastify.post('/', { schema: createCategorySchema }, async (request, reply) => {
-    try {
-      const category = await prisma.category.create({
-        data: request.body
-      });
+    const data = request.body
+    const insertObj = Object.fromEntries(
+      CATEGORY_INSERT_FIELDS
+        .filter(k => data[k] !== undefined)
+        .map(k => [toColumn(k), data[k]])
+    )
 
-      reply.code(201);
-      return category;
+    try {
+      const [category] = await sql`
+        insert into categories ${sql(insertObj)}
+        returning *
+      `
+      reply.code(201)
+      return category
     } catch (error) {
-      if (error.code === 'P2002') {
-        reply.code(409);
+      if (error.code === '23505') {
+        reply.code(409)
         return {
           error: 'Conflict',
           message: 'Category with this name or slug already exists'
-        };
+        }
       }
-      throw error;
+      throw error
     }
-  });
+  })
 
   // Update category
   fastify.patch('/:id', { schema: updateCategorySchema }, async (request, reply) => {
-    const { id } = request.params;
+    const { id } = request.params
+    const data = request.body
+    const updateObj = Object.fromEntries(
+      CATEGORY_INSERT_FIELDS
+        .filter(k => data[k] !== undefined)
+        .map(k => [toColumn(k), data[k]])
+    )
+
+    if (Object.keys(updateObj).length === 0) {
+      const [row] = await sql`select * from categories where id = ${id}`
+      if (!row) {
+        reply.code(404)
+        return { error: 'Category not found' }
+      }
+      return row
+    }
 
     try {
-      const category = await prisma.category.update({
-        where: { id },
-        data: request.body
-      });
+      const [category] = await sql`
+        update categories
+        set ${sql(updateObj)}
+        where id = ${id}
+        returning *
+      `
 
-      return category;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        reply.code(404);
-        return { error: 'Category not found' };
+      if (!category) {
+        reply.code(404)
+        return { error: 'Category not found' }
       }
-      if (error.code === 'P2002') {
-        reply.code(409);
+
+      return category
+    } catch (error) {
+      if (error.code === '23505') {
+        reply.code(409)
         return {
           error: 'Conflict',
           message: 'Category with this name or slug already exists'
-        };
+        }
       }
-      throw error;
+      throw error
     }
-  });
+  })
 
   // Delete category
   fastify.delete('/:id', { schema: deleteCategorySchema }, async (request, reply) => {
-    const { id } = request.params;
+    const { id } = request.params
 
-    try {
-      // Check if category has products
-      const productsCount = await prisma.product.count({
-        where: { categoryId: id }
-      });
+    const [{ count: productsCount }] = await sql`
+      select count(*)::int as count from products where category_id = ${id}
+    `
 
-      if (productsCount > 0) {
-        reply.code(409);
-        return {
-          error: 'Cannot Delete',
-          message: `Category has ${productsCount} products. Please reassign or delete them first.`
-        };
+    if (productsCount > 0) {
+      reply.code(409)
+      return {
+        error: 'Cannot Delete',
+        message: `Category has ${productsCount} products. Please reassign or delete them first.`
       }
-
-      await prisma.category.delete({
-        where: { id }
-      });
-
-      reply.code(204);
-      return;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        reply.code(404);
-        return { error: 'Category not found' };
-      }
-      throw error;
     }
-  });
+
+    const result = await sql`delete from categories where id = ${id}`
+
+    if (result.count === 0) {
+      reply.code(404)
+      return { error: 'Category not found' }
+    }
+
+    reply.code(204)
+    return
+  })
 
   // Bulk delete categories
   fastify.post('/bulk/delete', { schema: bulkDeleteCategoriesSchema }, async (request, reply) => {
     const { categoryIds } = request.body
 
-    // Check for categories with products
-    const categoriesWithProducts = await prisma.category.findMany({
-      where: { id: { in: categoryIds } },
-      include: {
-        _count: {
-          select: { products: true }
-        }
-      }
-    })
+    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+      return { success: true, deleted: 0, message: 'Successfully deleted 0 categories' }
+    }
 
-    const cannotDelete = categoriesWithProducts.filter(cat => cat._count.products > 0)
+    const blocking = await sql`
+      select c.id, c.name,
+        (select count(*)::int from products p where p.category_id = c.id) as product_count
+      from categories c
+      where c.id in ${sql(categoryIds)}
+    `
+
+    const cannotDelete = blocking.filter(c => c.productCount > 0)
 
     if (cannotDelete.length > 0) {
       reply.code(409)
@@ -186,15 +226,14 @@ export default async function adminCategoryRoutes(fastify, options) {
         categories: cannotDelete.map(cat => ({
           id: cat.id,
           name: cat.name,
-          productCount: cat._count.products
+          productCount: cat.productCount
         }))
       }
     }
 
-    // Delete all categories that have no products
-    const result = await prisma.category.deleteMany({
-      where: { id: { in: categoryIds } }
-    })
+    const result = await sql`
+      delete from categories where id in ${sql(categoryIds)}
+    `
 
     return {
       success: true,

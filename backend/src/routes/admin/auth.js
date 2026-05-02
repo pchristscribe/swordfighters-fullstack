@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 
 export default async function adminAuthRoutes(fastify, options) {
-  const { prisma } = fastify;
+  const { sql } = fastify;
 
   // Login route
   fastify.post('/login', async (request, reply) => {
@@ -16,9 +16,11 @@ export default async function adminAuthRoutes(fastify, options) {
     }
 
     // Find admin by email
-    const admin = await prisma.admin.findUnique({
-      where: { email: email.toLowerCase() }
-    });
+    const [admin] = await sql`
+      select id, email, password_hash, name, role, is_active
+      from admins
+      where email = ${String(email).toLowerCase()}
+    `;
 
     if (!admin) {
       reply.code(401);
@@ -37,7 +39,16 @@ export default async function adminAuthRoutes(fastify, options) {
       };
     }
 
-    // Verify password
+    // An admin without a password_hash hasn't enrolled the password fallback,
+    // so reject with the same generic message used for bad passwords.
+    if (!admin.passwordHash) {
+      reply.code(401);
+      return {
+        error: 'Authentication Failed',
+        message: 'Invalid email or password'
+      };
+    }
+
     const isValidPassword = await bcrypt.compare(password, admin.passwordHash);
 
     if (!isValidPassword) {
@@ -49,10 +60,11 @@ export default async function adminAuthRoutes(fastify, options) {
     }
 
     // Update last login
-    await prisma.admin.update({
-      where: { id: admin.id },
-      data: { lastLoginAt: new Date() }
-    });
+    await sql`
+      update admins
+      set last_login_at = now()
+      where id = ${admin.id}
+    `;
 
     // Set session
     request.session.adminId = admin.id;
@@ -86,17 +98,11 @@ export default async function adminAuthRoutes(fastify, options) {
       };
     }
 
-    const admin = await prisma.admin.findUnique({
-      where: { id: request.session.adminId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        lastLoginAt: true
-      }
-    });
+    const [admin] = await sql`
+      select id, email, name, role, is_active, last_login_at
+      from admins
+      where id = ${request.session.adminId}
+    `;
 
     if (!admin || !admin.isActive) {
       request.session.destroy();

@@ -9,29 +9,19 @@
 
 /**
  * Clean up expired WebAuthn challenges from the database
- * @param {Object} prisma - Prisma client instance
+ * @param {Function} sql - postgres-js client
  * @param {Object} logger - Logger instance (optional)
  * @returns {Promise<number>} Number of challenges cleaned up
  */
-export async function cleanupExpiredChallenges(prisma, logger = console) {
+export async function cleanupExpiredChallenges(sql, logger = console) {
   try {
-    const now = new Date();
-
-    // Find admins with expired challenges
-    const result = await prisma.admin.updateMany({
-      where: {
-        currentChallenge: {
-          not: null
-        },
-        challengeExpiresAt: {
-          lte: now
-        }
-      },
-      data: {
-        currentChallenge: null,
-        challengeExpiresAt: null
-      }
-    });
+    const result = await sql`
+      update admins
+      set current_challenge = null,
+          challenge_expires_at = null
+      where current_challenge is not null
+        and challenge_expires_at <= now()
+    `;
 
     if (result.count > 0) {
       logger.info({ count: result.count }, '🧹 Cleaned up expired challenges');
@@ -63,10 +53,10 @@ export function isValidChallenge(admin) {
  * Usage: fastify.addHook('onRequest', cleanupMiddleware)
  */
 export function cleanupMiddleware(request, reply, done) {
-  const { prisma, log } = request.server;
+  const { sql, log } = request.server;
 
   // Run cleanup asynchronously without blocking the request
-  cleanupExpiredChallenges(prisma, log).catch(error => {
+  cleanupExpiredChallenges(sql, log).catch(error => {
     log.error({ error: error.message }, 'Background cleanup failed');
   });
 

@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { buildApp } from './app.js';
-import prisma from './lib/prisma.js';
+import sql from './lib/sql.js';
 import redis from './lib/redis.js';
 import { flushSentry } from './lib/sentry.js';
 
@@ -15,8 +15,8 @@ const closeGracefully = async (signal) => {
     await fastify.close();
     console.log('Fastify server closed');
 
-    // Disconnect from database
-    await prisma.$disconnect();
+    // Close Postgres connections
+    await sql.end({ timeout: 5 });
     console.log('Database disconnected');
 
     // Close Redis connection
