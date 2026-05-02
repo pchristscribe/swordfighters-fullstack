@@ -48,9 +48,14 @@ export async function buildApp(opts = {}) {
   await fastify.register(cookie);
 
   // Register session with Redis store
+  const sessionSecret = process.env.SESSION_SECRET
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET environment variable is required')
+  }
+
   await fastify.register(session, {
     store: new RedisSessionStore(redis),
-    secret: process.env.SESSION_SECRET || 'change-this-secret-in-production-at-least-32-characters-long',
+    secret: sessionSecret,
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
