@@ -20,6 +20,9 @@
   "prisma": {
     "seed": "node prisma/seed.js"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "keywords": [
     "affiliate",
     "marketing",
