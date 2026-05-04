@@ -15,18 +15,23 @@ Swordfighters App is an affiliate marketing platform targeting gay men, curating
 swordfighters-fullstack/
 ├── admin-frontend/            # Admin panel with WebAuthn authentication (Port 3002)
 ├── frontend/                  # User-facing product catalog (Port 3000)
-├── backend/                   # Backend API (external service — not actively developed here)
+├── backend/                   # Fastify API (Prisma + Redis + WebAuthn) — deployable via Railway
 ├── backend-security-reference/ # Security reference implementation (middleware, routes, utils)
 ├── mcp-dhgate/                # DHgate MCP server for product scraping
-├── supabase/migrations/       # Supabase DB migrations
+├── supabase/
+│   ├── migrations/            # Supabase DB migrations (001 schema, 002 clicks ledger, 003 reviews, 004 admin WebAuthn)
+│   ├── functions/             # Edge functions (e.g. track-click)
+│   └── config.toml
+├── scripts/                   # Helper scripts (migrate.sh, backup-db.sh)
 ├── keys/                      # Key storage (see README inside)
-├── .github/                   # CI/CD workflows and issue templates
-├── docker-compose.yml         # PostgreSQL + Redis infrastructure
+├── .github/workflows/         # CI/CD: ci.yml, claude.yml, claude-code-review.yml, eslint.yml
+├── docker-compose.yml         # PostgreSQL 16 + Redis 7 infrastructure
+├── package.json               # Root meta-package (Bun + Supabase CLI tooling glue)
 ├── .env.example               # Environment variable template
 └── .mcp.json                  # MCP server config (DeepGraph Vue MCP)
 ```
 
-**Note**: The backend API is an external service deployed separately. Do not add backend features here.
+**Backend status**: The Fastify backend lives in this repo and has its own `railway.json`. Historically it was deployed externally; either path is supported (see `RAILWAY.md`). When developing backend features, work inside `backend/` — do not touch `backend-security-reference/`, which is read-only reference material.
 
 ## Tech Stack
 
@@ -34,7 +39,7 @@ swordfighters-fullstack/
 - **Framework**: Nuxt 4 (Vue 3 + SSR), `compatibilityDate: '2025-11-29'`
 - **Port**: 3002 (HMR: 24678)
 - **Modules**: `@pinia/nuxt`, `@nuxtjs/tailwindcss`, `@nuxtjs/supabase`
-- **Auth**: WebAuthn via `@simplewebauthn/browser@^13.2.2` (passwordless with security keys/Touch ID)
+- **Auth**: WebAuthn via `@simplewebauthn/browser@^13.2.2` (primary: security keys/Touch ID; fallback: email + password)
 - **Monitoring**: Sentry (`@sentry/nuxt`)
 - **Testing**: Vitest + Vue Test Utils + happy-dom
 - **Security**: CSRF protection, CSP headers configured in `nuxt.config.ts`
@@ -43,21 +48,25 @@ swordfighters-fullstack/
 - **Framework**: Nuxt 4 (Vue 3 + SSR), `compatibilityDate: '2025-07-15'`
 - **Port**: 3000 (HMR: 24677)
 - **Modules**: `@nuxtjs/tailwindcss`, `@pinia/nuxt`, `nuxt-headlessui` (prefix: `Headless`), `@nuxtjs/supabase`
+- **Auth**: Supabase social OAuth (Google, GitHub, Discord) via `@supabase/supabase-js`
 - **Monitoring**: Sentry (`@sentry/nuxt`)
-- **Testing**: Vitest + Vue Test Utils + happy-dom
+- **Testing**: Vitest + Vue Test Utils + happy-dom; Playwright for e2e (`test:e2e`)
 - **Linting**: ESLint with typescript-eslint, eslint-plugin-vue
 
-### Backend API (External Service)
-- Runtime: Node.js 20+, Framework: Fastify
-- Database: PostgreSQL with Prisma ORM
+### Backend API (`backend/`)
+- Runtime: Node.js 20+, Framework: Fastify 5
+- Database: PostgreSQL via Prisma 7 (`prisma/schema.prisma`, `prisma/seed.js`)
+- Sessions: `@fastify/session` + `connect-redis` (Redis-backed)
 - Task Queue: Bull (Redis-backed)
-- Caching: Redis
-- Affiliate Link Tracking: Dub + custom layer
+- WebAuthn: `@simplewebauthn/server` (admin auth)
+- Monitoring: Sentry (`@sentry/node`, `@sentry/profiling-node`)
+- Routes: `src/routes/products.js`, `src/routes/categories.js`, and five admin routes: `src/routes/admin/auth.js`, `categories.js`, `products.js`, `reviews.js`, `webauthn.js`
+- Health check: `GET /health` (verifies Postgres + Redis)
 
 ### Infrastructure
 - Docker Compose: PostgreSQL 16 (`swordfighters-postgres`) + Redis 7 (`swordfighters-redis`)
-- Production: Vercel (frontends), Railway/Render (backend), Supabase (DB), Sentry (monitoring)
-- CI/CD: GitHub Actions (`main.yml`, `claude.yml`, `claude-code-review.yml`, `eslint.yml`)
+- Production: Railway (all three services — see `RAILWAY.md`), Supabase (managed Postgres + Auth + Edge Functions), Sentry (monitoring). Vercel is also supported for the Nuxt frontends.
+- CI/CD: GitHub Actions (`ci.yml`, `claude.yml`, `claude-code-review.yml`, `eslint.yml`)
 
 ## Directory Deep-Dive
 
@@ -71,6 +80,7 @@ admin-frontend/
 │   ├── composables/
 │   │   ├── useCsrf.ts           # CSRF token management
 │   │   ├── useDarkMode.ts       # Dark/light mode toggle
+│   │   ├── useRateLimit.ts      # Client-side rate limiter (5/min, 5-min lockout)
 │   │   └── useSupabaseAdmin.ts  # Supabase admin utilities
 │   ├── layouts/
 │   │   └── default.vue
@@ -78,7 +88,7 @@ admin-frontend/
 │   │   └── auth.ts              # Route guard for authenticated pages
 │   ├── pages/
 │   │   ├── index.vue            # Dashboard
-│   │   ├── login.vue            # WebAuthn login
+│   │   ├── login.vue            # WebAuthn / password login
 │   │   ├── products/index.vue   # Product management
 │   │   ├── categories.vue       # Category management
 │   │   ├── reviews.vue          # Review moderation
@@ -92,14 +102,16 @@ admin-frontend/
 │   └── utils/
 │       └── security.ts          # Security helpers
 ├── tests/
-│   ├── auth.test.ts             # WebAuthn auth tests (30+)
+│   ├── auth.test.ts             # WebAuthn + password auth tests (174+ total)
 │   ├── darkMode.test.ts
 │   └── security.test.ts
 ├── nuxt.config.ts
 ├── tailwind.config.js
 ├── vitest.config.ts
+├── playwright.config.ts         # E2E config
 ├── sentry.client.config.ts
-└── sentry.server.config.ts
+├── sentry.server.config.ts
+└── railway.json                 # Railway deploy config
 ```
 
 ### User Frontend (`frontend/`)
@@ -114,6 +126,7 @@ frontend/
 │   │   ├── SearchBar.vue
 │   │   ├── Pagination.vue
 │   │   ├── DarkModeToggle.vue
+│   │   ├── SocialAuth.vue            # Supabase OAuth buttons (Google, GitHub, Discord)
 │   │   ├── feedback/
 │   │   │   ├── AppToast.vue
 │   │   │   ├── AppToastContainer.vue
@@ -127,29 +140,32 @@ frontend/
 │   │       └── SortingControls.vue
 │   ├── composables/
 │   │   ├── useDarkMode.ts
-│   │   ├── useApi.ts                 # API communication
+│   │   ├── useAuth.ts                # Supabase OAuth sign-in / sign-out
 │   │   ├── useToast.ts               # Toast notification system
 │   │   └── useSupabaseProducts.ts    # Supabase product fetching
 │   ├── layouts/
 │   │   └── default.vue
 │   ├── pages/
 │   │   ├── index.vue                 # Product catalog home
+│   │   ├── login.vue                 # OAuth sign-in
+│   │   ├── confirm.vue               # OAuth redirect handler
 │   │   ├── products/[id].vue         # Product detail (dynamic route)
+│   │   ├── seasonal/[season].vue     # Seasonal product page
 │   │   └── search-demo.vue           # Search demonstration
 │   ├── stores/
 │   │   ├── filters.ts   # Filter state (category, platform, price, rating, sort)
-│   │   ├── cart.ts      # Shopping cart
 │   │   └── products.ts  # Product catalog
-│   └── types/
-│       ├── index.ts
-│       ├── filters.ts
-│       ├── database.types.ts
-│       └── supabase.ts
+│   ├── types/
+│   │   ├── index.ts
+│   │   ├── filters.ts
+│   │   ├── database.types.ts
+│   │   └── supabase.ts
+│   └── utils/
+│       └── seasons.ts                # Season name + date helpers
 ├── tests/
 │   ├── ProductCard.test.ts
 │   ├── ProductCardSimple.test.ts
 │   ├── SearchBar.test.ts
-│   ├── cart.test.ts
 │   ├── darkMode.test.ts
 │   ├── filters.test.ts
 │   ├── stores.test.ts
@@ -159,13 +175,58 @@ frontend/
 ├── nuxt.config.ts
 ├── tailwind.config.js
 ├── vitest.config.ts
+├── playwright.config.ts             # E2E config
 ├── eslint.config.ts
-└── tsconfig.json
+├── tsconfig.json
+└── railway.json                     # Railway deploy config
+```
+
+### Backend API (`backend/`)
+
+```
+backend/
+├── prisma/
+│   ├── schema.prisma          # Source of truth for the Postgres schema
+│   ├── migrations/
+│   └── seed.js
+├── src/
+│   ├── index.js               # Server entry (Fastify, binds 0.0.0.0:$PORT)
+│   ├── app.js                 # Plugin/route registration
+│   ├── lib/
+│   │   ├── __tests__/         # Unit tests for lib modules (e.g. sentry.test.js)
+│   │   ├── prisma.js          # Prisma client singleton
+│   │   ├── redis.js           # ioredis client
+│   │   ├── sessionStore.js    # connect-redis store
+│   │   └── sentry.js
+│   ├── middleware/adminAuth.js
+│   ├── routes/
+│   │   ├── products.js
+│   │   ├── categories.js
+│   │   └── admin/
+│   │       ├── auth.js
+│   │       ├── categories.js
+│   │       ├── products.js
+│   │       ├── reviews.js
+│   │       └── webauthn.js
+│   ├── schemas/
+│   │   ├── review.js          # Fastify JSON schema
+│   │   └── category.js        # Fastify JSON schema
+│   └── utils/cleanupExpiredChallenges.js
+├── tests/                     # Vitest unit tests
+├── package.json
+├── railway.json
+└── vitest.config.js
 ```
 
 ### DHgate MCP Server (`mcp-dhgate/`)
 
-MCP server for scraping DHgate product data. Has its own `src/` with `index.ts`, `tools/`, `types.ts`, `utils/`, and `config.ts`. Configured in `.mcp.json` via `DeepGraph Vue MCP` alongside this tool.
+MCP server for scraping DHgate product data. Has its own `src/` with `index.ts`, `tools/`, `types.ts`, `utils/`, `api/`, and `config.ts`. Configured in `.mcp.json` via `DeepGraph Vue MCP` alongside this tool.
+
+### Supabase (`supabase/`)
+
+- `config.toml` — local Supabase CLI config
+- `migrations/` — SQL migrations (`001_initial_schema.sql`, `002_clicks_ledger.sql`, `003_reviews.sql`, `004_admin_webauthn.sql`)
+- `functions/track-click/` — Edge Function that records affiliate-link clicks into the clicks ledger
 
 ## Development Setup
 
@@ -189,31 +250,45 @@ cd frontend && npm install && npm run dev
 
 Both frontends can run concurrently — they use separate HMR ports (24678 and 24677).
 
+### Backend Development
+
+```bash
+cd backend
+npm install
+npm run prisma:generate     # Generate Prisma client
+npm run prisma:migrate      # Run dev migrations
+npm run prisma:seed         # Seed dev data
+npm run dev                 # Start Fastify with --watch (default :3001)
+```
+
 ### Running Tests
 
 ```bash
-# Admin Frontend
-cd admin-frontend
-npm test              # Run all tests
+# Admin Frontend / User Frontend / Backend
+cd <workspace>
+npm test              # Run all unit tests (Vitest)
 npm run test:watch    # Watch mode
 npm run test:ui       # Vitest UI
 npm run test:coverage # Coverage report
 
-# User Frontend
-cd frontend
-npm test
-npm run test:watch
-npm run test:ui
-npm run test:coverage
+# Frontends only — Playwright E2E
+npm run test:e2e
+npm run test:e2e:ui
 ```
 
 ### Database Management
 ```bash
-# PostgreSQL
+# PostgreSQL (local Docker)
 docker exec -it swordfighters-postgres psql -U swordfighters -d swordfighters_db
 
 # Redis CLI
 docker exec -it swordfighters-redis redis-cli -a dev_redis_password
+
+# Apply Supabase migrations to the hosted project
+SUPABASE_ACCESS_TOKEN=... SUPABASE_PROJECT_REF=... ./scripts/migrate.sh
+
+# Local Postgres backup (retains 30 days by default)
+./scripts/backup-db.sh
 ```
 
 ### Common Docker Commands
@@ -235,16 +310,15 @@ docker-compose down -v        # Remove volumes (⚠️ deletes all data)
 - **Path aliases**: `~/`, `@/` (admin also has `#app`)
 
 ### Test Coverage Stats
-- **66 Tests Created**: WebAuthn auth, input validation, frontend stores, components
+- **174+ Tests**: WebAuthn + password auth, input validation, frontend stores, components
 - **52 Security Bugs Identified**: Documented in `VALIDATION_BUGS_FOUND.md`
 - **95% Critical Path Coverage**: All major authentication flows
 
 ### Key Test Files
 | File | Description |
 |------|-------------|
-| `admin-frontend/tests/auth.test.ts` | WebAuthn auth validation (30+ tests) |
+| `admin-frontend/tests/auth.test.ts` | WebAuthn + password auth validation (174+ tests) |
 | `admin-frontend/tests/security.test.ts` | Input sanitization, XSS, CSRF |
-| `frontend/tests/cart.test.ts` | Cart store operations |
 | `frontend/tests/filters.test.ts` | Filter store and UI |
 | `frontend/tests/SearchBar.test.ts` | Search component (17.9 KB) |
 | `frontend/tests/ProductCard.test.ts` | Product card component |
@@ -292,20 +366,32 @@ Both frontends share an identical Tailwind config with:
 | Store | File | Purpose |
 |-------|------|---------|
 | `filters` | `stores/filters.ts` | Category, platform, price range, rating, sort |
-| `cart` | `stores/cart.ts` | Cart items and totals |
 | `products` | `stores/products.ts` | Product catalog data |
 
 **Filter store** maps to URL query params via `toQueryParams()` and `initFromQuery()`. Price range: 0–500. Sort: `createdAt` (default), `desc` (default order).
 
-## Authentication (Admin Frontend)
+## Authentication
 
-WebAuthn (passwordless) via `@simplewebauthn/browser`:
-- Login page: `/login`
+### Admin Frontend — WebAuthn + Password fallback
+
+Primary login is WebAuthn (security keys, Touch ID, Windows Hello) via `@simplewebauthn/browser` (client) and `@simplewebauthn/server` (backend). A password toggle on the login page falls back to `POST /api/admin/auth/login` (bcrypt) for devices that can't use WebAuthn.
+
+- Login page: `/login` — defaults to WebAuthn; "Use password instead" toggle reveals password input
 - Auth middleware: `app/middleware/auth.ts` — guards all protected routes
-- Auth store: `app/stores/auth.ts`
-- CSRF protection: `useCsrf` composable
+- Auth store: `app/stores/auth.ts` — `loginWithSecurityKey()`, `loginWithPassword()`, `checkSession()`, `logout()`
+- CSRF protection: `useCsrf` composable (token on every mutating request, rotated on login)
+- Client rate limiting: `useRateLimit` (5 attempts / minute, 5-minute lockout; shared bucket for both login modes)
 - Supabase backed: `useSupabaseAdmin` composable
+- Backend routes: `backend/src/routes/admin/webauthn.js` (WebAuthn), `backend/src/routes/admin/auth.js` (password + session)
 - CSP headers configured in `nuxt.config.ts` to prevent XSS
+
+### User Frontend — Supabase OAuth
+
+Supabase social login via `@supabase/supabase-js`:
+- Providers: Google, GitHub, Discord (configurable in Supabase dashboard)
+- Composable: `useAuth` (`signInWithOAuth`, `signOut`, reactive `user`)
+- Component: `SocialAuth.vue`
+- Pages: `/login` initiates OAuth, `/confirm` handles the redirect
 
 ## Environment Variables
 
@@ -315,14 +401,22 @@ Key variables (see `.env.example` for full list):
 |----------|-------------|
 | `NUXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NUXT_PUBLIC_SUPABASE_KEY` | Supabase anon key |
-| `SUPABASE_SECRET_KEY` | Supabase service role key (admin only) |
-| `API_BASE_URL` | Backend API base (default: `http://localhost:3001`) |
+| `SUPABASE_SECRET_KEY` | Supabase service role key (admin only — never expose client) |
+| `NUXT_PUBLIC_SITE_URL` | Public site URL (canonical links, OG, sitemap) |
+| `NUXT_PUBLIC_API_BASE` | Backend API base — set this in both frontends; exposed via Nuxt runtime config (`useRuntimeConfig().public.apiBase`) |
+| `API_BASE_URL` | Backend API base for server-side / backend-internal use (default: `http://localhost:3001`); not visible to the browser |
 | `DATABASE_URL` | PostgreSQL connection string for Prisma |
-| `REDIS_PASSWORD` | Redis password (default: `dev_redis_password`) |
+| `REDIS_URL` / `REDIS_PASSWORD` | Redis connection (default password: `dev_redis_password`) |
+| `SESSION_SECRET` | Backend session secret (32+ chars; required in production) |
+| `FRONTEND_URL` / `ADMIN_URL` | Backend CORS allowlist |
+| `RP_ID` | WebAuthn relying party ID (e.g. `admin.yourdomain.com`) |
+| `SENTRY_DSN` / `NUXT_PUBLIC_SENTRY_DSN` | Sentry DSNs (server / client) |
+| `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF` | Required for `scripts/migrate.sh` |
 | `DHGATE_API_KEY` | DHgate affiliate API key |
 | `ALIEXPRESS_API_KEY` | AliExpress affiliate API key |
 | `AMAZON_ASSOCIATES_TAG` | Amazon Associates tag |
 | `WISH_API_KEY` | Wish affiliate API key |
+| `DUB_API_KEY` / `DUB_WORKSPACE_ID` | Dub.co affiliate link tracking |
 
 ## Code Style Rules
 
@@ -354,14 +448,16 @@ Key variables (see `.env.example` for full list):
 | `README.md` | Main project overview |
 | `CLAUDE.md` | This file — AI assistant guidance |
 | `ADMIN_PANEL_SETUP.md` | WebAuthn setup and admin panel guide |
+| `RAILWAY.md` | Railway deployment for backend + both frontends |
 | `TEST_COVERAGE_SUMMARY.md` | Test metrics and results |
 | `VALIDATION_BUGS_FOUND.md` | Security vulnerabilities documented |
 | `SECURITY.md` | Security overview |
 | `SECURITY_GUIDE.md` | Detailed security guide |
 | `TOUCHID_DEBUG.md` | Touch ID debugging reference |
+| `SearchBar_Component_Report.md` | SearchBar component analysis |
+| `SEARCHBAR_BASELINE_TEST_RESULTS.md` | SearchBar baseline test results |
 | `frontend/FILTERING_SYSTEM.md` | Product filter architecture |
 | `frontend/FILTERING_IMPLEMENTATION_REPORT.md` | Filter implementation details |
-| `SearchBar_Component_Report.md` | SearchBar component analysis |
 
 ## Legal Compliance
 

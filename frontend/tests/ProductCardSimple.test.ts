@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ProductCardSimple from '../app/components/ProductCardSimple.vue'
+import ProductCard from '../app/components/ProductCard.vue'
 import type { Product } from '../app/types'
 
 // ProductCardSimple is a thin wrapper around ProductCard with variant="simple".
 // These tests verify the delegation contract: correct rendering and event forwarding.
 
 const NuxtLinkStub = { template: '<a :href="to"><slot /></a>', props: ['to'] }
-const global = { stubs: { NuxtLink: NuxtLinkStub } }
+// ProductCard is auto-imported by Nuxt at runtime; in tests we must register it
+// explicitly so the wrapper's <ProductCard> resolves.
+const global = { stubs: { NuxtLink: NuxtLinkStub }, components: { ProductCard } }
 
 const mockProduct: Product = {
   id: 'product-1',

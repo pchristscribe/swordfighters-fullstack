@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser'
 import { getOrCreateCsrfToken, rotateCsrfToken, clearCsrfToken } from '~/utils/security'
+import { useRateLimit } from '~/composables/useRateLimit'
+
+const rateLimit = useRateLimit()
 
 interface Admin {
   id: string
@@ -109,6 +112,13 @@ export const useAuthStore = defineStore('auth', {
       const validatedEmail = emailValidation.normalized!
       const sanitizedDeviceName = sanitizeDeviceName(deviceName)
 
+      const rateLimitCheck = rateLimit.check('register')
+      if (!rateLimitCheck.allowed) {
+        const seconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000)
+        this.error = `Too many attempts. Please try again in ${seconds} seconds.`
+        return false
+      }
+
       this.loading = true
       this.error = null
 
@@ -147,8 +157,10 @@ export const useAuthStore = defineStore('auth', {
         })
 
         console.log('✅ Registration verified:', verificationResponse)
+        if (verificationResponse.verified) rateLimit.reset('register')
         return verificationResponse.verified
       } catch (err: any) {
+        rateLimit.record('register')
         console.error('❌ Registration error:', err)
 
         // Provide user-friendly error messages
@@ -192,6 +204,13 @@ export const useAuthStore = defineStore('auth', {
 
       const validatedEmail = emailValidation.normalized!
 
+      const rateLimitCheck = rateLimit.check('login')
+      if (!rateLimitCheck.allowed) {
+        const seconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000)
+        this.error = `Too many attempts. Please try again in ${seconds} seconds.`
+        return false
+      }
+
       this.loading = true
       this.error = null
 
@@ -228,11 +247,13 @@ export const useAuthStore = defineStore('auth', {
         if (verificationResponse.verified && verificationResponse.admin) {
           console.log('✅ Authentication successful')
           this.admin = verificationResponse.admin
+          rateLimit.reset('login')
           rotateCsrfToken()
           return true
         }
         return false
       } catch (err: any) {
+        rateLimit.record('login')
         console.error('❌ Authentication error:', err)
 
         // Provide user-friendly error messages
@@ -252,6 +273,65 @@ export const useAuthStore = defineStore('auth', {
           this.error = errorMsg
         }
 
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async loginWithPassword(email: unknown, password: unknown) {
+      const emailValidation = validateEmail(email)
+      if (!emailValidation.isValid) {
+        this.error = emailValidation.error || 'Invalid email'
+        return false
+      }
+
+      if (typeof password !== 'string' || password.length === 0) {
+        this.error = 'Password is required'
+        return false
+      }
+
+      const validatedEmail = emailValidation.normalized!
+
+      const rateLimitCheck = rateLimit.check('login')
+      if (!rateLimitCheck.allowed) {
+        const seconds = Math.ceil((rateLimitCheck.retryAfterMs || 0) / 1000)
+        this.error = `Too many attempts. Please try again in ${seconds} seconds.`
+        return false
+      }
+
+      this.loading = true
+      this.error = null
+
+      try {
+        const config = useRuntimeConfig()
+        const response = await $fetch(`${config.public.apiBase}/api/admin/auth/login`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'X-CSRF-Token': getOrCreateCsrfToken() },
+          body: { email: validatedEmail, password }
+        }) as { success?: boolean; admin?: Admin }
+
+        if (response.success && response.admin) {
+          this.admin = response.admin
+          rateLimit.reset('login')
+          rotateCsrfToken()
+          return true
+        }
+        this.error = 'Unexpected response from server'
+        return false
+      } catch (err: any) {
+        rateLimit.record('login')
+
+        if (err.statusCode === 401 || err.status === 401) {
+          this.error = 'Invalid email or password'
+        } else if (err.statusCode === 403 || err.status === 403) {
+          this.error = err.data?.message || 'Account is inactive'
+        } else if (err.message?.includes('fetch') || err.cause?.code === 'ECONNREFUSED') {
+          this.error = 'Cannot connect to backend server. Make sure it\'s running on port 3001.'
+        } else {
+          this.error = err.data?.error || err.message || 'Login failed'
+        }
         return false
       } finally {
         this.loading = false

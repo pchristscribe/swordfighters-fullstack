@@ -34,6 +34,21 @@ export interface Product {
   createdAt: string
   updatedAt: string
   affiliateLinks?: AffiliateLink[]
+  reviews?: Review[]
+}
+
+export interface Review {
+  id: string
+  productId: string
+  rating: number
+  title?: string
+  content: string
+  pros: string[]
+  cons: string[]
+  authorName: string
+  isFeatured: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface AffiliateLink {
@@ -57,6 +72,7 @@ export interface ProductFilters {
   minPrice?: number
   maxPrice?: number
   minRating?: number
+  tag?: string
   page?: number
   limit?: number
   sortBy?: string

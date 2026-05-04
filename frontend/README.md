@@ -63,9 +63,8 @@ frontend/
 │   │
 │   ├── composables/
 │   │   ├── useDarkMode.ts            # Dark/light mode state + persistence
-│   │   ├── useApi.ts                 # API communication wrapper
 │   │   ├── useToast.ts               # Toast notification system
-│   │   └── useSupabaseProducts.ts    # Supabase product data fetching
+│   │   └── useSupabaseProducts.ts    # Supabase product data fetching (primary data layer)
 │   │
 │   ├── layouts/
 │   │   └── default.vue               # Shared layout (nav, footer)
@@ -77,7 +76,6 @@ frontend/
 │   │
 │   ├── stores/
 │   │   ├── filters.ts                # Filter state (category, platform, price, rating, sort)
-│   │   ├── cart.ts                   # Shopping cart (items, quantities, totals)
 │   │   └── products.ts               # Product catalog + categories data
 │   │
 │   └── types/
@@ -90,7 +88,6 @@ frontend/
 │   ├── ProductCard.test.ts
 │   ├── ProductCardSimple.test.ts
 │   ├── SearchBar.test.ts
-│   ├── cart.test.ts
 │   ├── darkMode.test.ts
 │   ├── filters.test.ts
 │   ├── stores.test.ts
@@ -129,10 +126,6 @@ Key methods:
 - `toQueryParams()` — serialize to URL query string
 - `toProductFilters` getter — convert to API request format
 - `clearAllFilters()` — reset to defaults
-
-### Cart Store (`stores/cart.ts`)
-
-Shopping cart with item/quantity management.
 
 ### Products Store (`stores/products.ts`)
 

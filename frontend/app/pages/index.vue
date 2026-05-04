@@ -3,6 +3,17 @@ const productStore = useProductStore()
 const filterStore = useFilterStore()
 const router = useRouter()
 const route = useRoute()
+const { public: { siteUrl } } = useRuntimeConfig()
+
+useSeoMeta({
+  title: 'Swordfighters',
+  description: 'Curated products for gay men — reviewed and hand-picked from DHgate, AliExpress, Amazon, and Wish.',
+  ogTitle: 'Swordfighters — Curated Products for Gay Men',
+  ogDescription: 'Curated products for gay men — reviewed and hand-picked from DHgate, AliExpress, Amazon, and Wish.',
+  ogUrl: siteUrl,
+  ogType: 'website',
+  twitterCard: 'summary_large_image',
+})
 
 // Initialize filters from URL query params on mount
 onMounted(async () => {

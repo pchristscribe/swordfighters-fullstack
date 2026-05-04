@@ -18,6 +18,11 @@ if (typeof window === 'undefined') {
 }
 global.window.PublicKeyCredential = class MockPublicKeyCredential {}
 
+// Stub rate limiter so it never blocks during auth unit tests
+vi.mock('../app/composables/useRateLimit', () => ({
+  useRateLimit: () => ({ check: () => ({ allowed: true }), record: () => {}, reset: () => {} }),
+}))
+
 // Import after mocks are set up
 import { useAuthStore } from '../app/stores/auth'
 
@@ -1091,6 +1096,137 @@ describe('Auth Store - Security Edge Cases', () => {
       // Error should be from API failure, not initial state
       expect(store.error).not.toBe('Initial error')
       expect(store.error).toBeTruthy()
+    })
+  })
+
+  describe('loginWithPassword', () => {
+    it('should reject missing password', async () => {
+      const store = useAuthStore()
+      const result = await store.loginWithPassword('admin@example.com', '')
+      expect(result).toBe(false)
+      expect(store.error).toBe('Password is required')
+    })
+
+    it('should reject non-string password', async () => {
+      const store = useAuthStore()
+      const result = await store.loginWithPassword('admin@example.com', null)
+      expect(result).toBe(false)
+      expect(store.error).toBe('Password is required')
+    })
+
+    it('should reject invalid email before checking password', async () => {
+      const store = useAuthStore()
+      const result = await store.loginWithPassword('not-an-email', 'placeholder-pwd')
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid email format')
+    })
+
+    it('should set admin and return true on success', async () => {
+      const store = useAuthStore()
+      global.$fetch = vi.fn().mockResolvedValue({
+        success: true,
+        admin: { id: '1', email: 'admin@example.com', name: 'Admin', role: 'admin' }
+      })
+
+      const result = await store.loginWithPassword('admin@example.com', 'placeholder-pwd')
+
+      expect(result).toBe(true)
+      expect(store.admin?.email).toBe('admin@example.com')
+      expect(store.error).toBeNull()
+    })
+
+    it('should normalize email to lowercase before sending', async () => {
+      const store = useAuthStore()
+      const fetchSpy = vi.fn().mockResolvedValue({
+        success: true,
+        admin: { id: '1', email: 'admin@example.com', name: 'A', role: 'admin' }
+      })
+      global.$fetch = fetchSpy
+
+      await store.loginWithPassword('  ADMIN@EXAMPLE.COM  ', 'placeholder-pwd')
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/admin/auth/login'),
+        expect.objectContaining({
+          method: 'POST',
+          body: { email: 'admin@example.com', password: 'placeholder-pwd' }
+        })
+      )
+    })
+
+    it('should map 401 to a friendly invalid-credentials message', async () => {
+      const store = useAuthStore()
+      global.$fetch = vi.fn().mockRejectedValue({ statusCode: 401 })
+
+      const result = await store.loginWithPassword('admin@example.com', 'bad-pwd')
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Invalid email or password')
+    })
+
+    it('should map 403 to the inactive-account message from server', async () => {
+      const store = useAuthStore()
+      global.$fetch = vi.fn().mockRejectedValue({
+        statusCode: 403,
+        data: { message: 'Your admin account has been deactivated' }
+      })
+
+      const result = await store.loginWithPassword('admin@example.com', 'placeholder-pwd')
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Your admin account has been deactivated')
+    })
+
+    it('should clear loading state after error', async () => {
+      const store = useAuthStore()
+      global.$fetch = vi.fn().mockRejectedValue(new Error('boom'))
+
+      await store.loginWithPassword('admin@example.com', 'placeholder-pwd')
+
+      expect(store.loading).toBe(false)
+    })
+
+    it('should surface an error when server returns success without admin payload', async () => {
+      const store = useAuthStore()
+      global.$fetch = vi.fn().mockResolvedValue({ success: true })
+
+      const result = await store.loginWithPassword('admin@example.com', 'placeholder-pwd')
+
+      expect(result).toBe(false)
+      expect(store.error).toBe('Unexpected response from server')
+    })
+
+    it('should surface a friendly message for connection refused', async () => {
+      const store = useAuthStore()
+      global.$fetch = vi.fn().mockRejectedValue({ cause: { code: 'ECONNREFUSED' } })
+
+      const result = await store.loginWithPassword('admin@example.com', 'placeholder-pwd')
+
+      expect(result).toBe(false)
+      expect(store.error).toContain('Cannot connect to backend')
+    })
+
+    it('should short-circuit when rate limit is exhausted', async () => {
+      vi.resetModules()
+      vi.doMock('../app/composables/useRateLimit', () => ({
+        useRateLimit: () => ({
+          check: () => ({ allowed: false, retryAfterMs: 12000 }),
+          record: () => {},
+          reset: () => {}
+        })
+      }))
+
+      const { useAuthStore: useStoreWithLimit } = await import('../app/stores/auth')
+      const store = useStoreWithLimit()
+      const fetchSpy = vi.fn()
+      global.$fetch = fetchSpy
+
+      const result = await store.loginWithPassword('admin@example.com', 'placeholder-pwd')
+
+      expect(result).toBe(false)
+      expect(store.error).toContain('Too many attempts')
+      expect(fetchSpy).not.toHaveBeenCalled()
+      vi.doUnmock('../app/composables/useRateLimit')
     })
   })
 })
