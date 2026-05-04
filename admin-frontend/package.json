@@ -2,6 +2,9 @@
   "name": "admin-frontend",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "PORT=3002 VITE_HMR_PORT= nuxt dev",
