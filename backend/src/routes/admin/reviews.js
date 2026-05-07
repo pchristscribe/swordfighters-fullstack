@@ -8,6 +8,8 @@ import {
   bulkToggleFeaturedSchema
 } from '../../schemas/review.js'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const SORTABLE = {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
@@ -212,7 +214,13 @@ export default async function adminReviewRoutes(fastify, options) {
     const { reviewIds } = request.body
 
     if (!Array.isArray(reviewIds) || reviewIds.length === 0) {
-      return { success: true, deleted: 0, message: 'Successfully deleted 0 reviews' }
+      reply.code(400)
+      return { error: 'reviewIds array is required' }
+    }
+
+    if (reviewIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid review ID format' }
     }
 
     const result = await sql`delete from reviews where id in ${sql(reviewIds)}`
@@ -229,12 +237,13 @@ export default async function adminReviewRoutes(fastify, options) {
     const { reviewIds, isFeatured } = request.body
 
     if (!Array.isArray(reviewIds) || reviewIds.length === 0) {
-      return {
-        success: true,
-        updated: 0,
-        isFeatured,
-        message: 'Successfully updated 0 reviews'
-      }
+      reply.code(400)
+      return { error: 'reviewIds array is required' }
+    }
+
+    if (reviewIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid review ID format' }
     }
 
     const result = await sql`

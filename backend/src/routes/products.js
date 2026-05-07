@@ -80,7 +80,7 @@ export default async function productRoutes(fastify, options) {
 
     const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`);
 
-    const cacheKey = `products:list:${JSON.stringify(request.query)}`;
+    const cacheKey = `products:list:${JSON.stringify({ platform, categoryId, status, page, limit, minPrice, maxPrice, sortBy, order })}`;
     const cached = await redis.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);

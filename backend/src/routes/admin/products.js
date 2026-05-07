@@ -20,6 +20,8 @@ const SORTABLE = {
   priceUpdatedAt: 'price_updated_at'
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const PRODUCT_FIELDS = [
   'externalId', 'platform', 'title', 'description', 'imageUrl', 'price',
   'currency', 'status', 'categoryId', 'rating', 'reviewCount', 'tags', 'metadata'
@@ -283,8 +285,13 @@ export default async function adminProductRoutes(fastify, options) {
     const { productIds, status } = request.body;
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-      reply.code(400);
-      return { error: 'productIds array is required' };
+      reply.code(400)
+      return { error: 'productIds array is required' }
+    }
+
+    if (productIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid product ID format' }
     }
 
     if (!['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK'].includes(status)) {
@@ -314,8 +321,13 @@ export default async function adminProductRoutes(fastify, options) {
     const { productIds } = request.body;
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-      reply.code(400);
-      return { error: 'productIds array is required' };
+      reply.code(400)
+      return { error: 'productIds array is required' }
+    }
+
+    if (productIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid product ID format' }
     }
 
     const result = await sql`
