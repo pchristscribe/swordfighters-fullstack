@@ -132,7 +132,12 @@ export default async function webauthnRoutes(fastify, options) {
       let admin = await loadAdminByEmail(sql, email)
 
       if (!admin) {
-        fastify.log.info({ email }, 'Creating new admin')
+        if (process.env.NODE_ENV === 'production') {
+          fastify.log.warn({ email }, 'Registration attempted for unknown email in production')
+          reply.code(403)
+          return { error: 'Admin account not found. Contact an existing administrator.' }
+        }
+        fastify.log.info({ email }, 'Creating new admin (dev/test bootstrap)')
         const [created] = await sql`
           insert into admins ${sql({
             email,

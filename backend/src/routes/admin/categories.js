@@ -34,7 +34,7 @@ function withCountShape(row) {
 }
 
 export default async function adminCategoryRoutes(fastify, options) {
-  const { sql } = fastify
+  const { sql, redis } = fastify
 
   fastify.addHook('onRequest', adminAuth)
 
@@ -121,6 +121,7 @@ export default async function adminCategoryRoutes(fastify, options) {
         insert into categories ${sql(insertObj)}
         returning *
       `
+      await redis.del('categories:all')
       reply.code(201)
       return category
     } catch (error) {
@@ -171,6 +172,7 @@ export default async function adminCategoryRoutes(fastify, options) {
         return { error: 'Category not found' }
       }
 
+      await redis.del('categories:all')
       return category
     } catch (error) {
       if (error.code === '23505') {
@@ -222,6 +224,7 @@ export default async function adminCategoryRoutes(fastify, options) {
       return { error: 'Category not found' }
     }
 
+    await redis.del('categories:all')
     reply.code(204)
     return
   })
@@ -266,6 +269,7 @@ export default async function adminCategoryRoutes(fastify, options) {
       delete from categories where id in ${sql(categoryIds)}
     `
 
+    await redis.del('categories:all')
     return {
       success: true,
       deleted: result.count,
