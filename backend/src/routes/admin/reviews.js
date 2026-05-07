@@ -59,6 +59,11 @@ export default async function adminReviewRoutes(fastify, options) {
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
     const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
+    if (productId && !UUID_RE.test(productId)) {
+      reply.code(400)
+      return { error: 'Invalid productId' }
+    }
+
     const conditions = []
     if (productId) conditions.push(sql`product_id = ${productId}`)
     if (isFeatured !== undefined) conditions.push(sql`is_featured = ${isFeatured === 'true'}`)

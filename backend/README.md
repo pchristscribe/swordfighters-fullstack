@@ -1,15 +1,27 @@
 # swordfighters-backend
 
-To install dependencies:
+Fastify API for the Swordfighters affiliate marketing platform. Requires Node.js ≥ 24 and a running PostgreSQL + Redis instance (see `docker-compose.yml` in the repo root).
+
+## Install
 
 ```bash
-bun install
+npm install
 ```
 
-To run:
+## Run
 
 ```bash
-bun run src/index.js
+# Development (auto-restart on file changes)
+npm run dev
+
+# Production
+npm start
 ```
 
-This project was created using `bun init` in bun v1.3.13. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+## Test
+
+```bash
+npm test
+```
+
+See the root `CLAUDE.md` and `RAILWAY.md` for full environment variable documentation and deployment instructions.

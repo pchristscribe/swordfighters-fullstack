@@ -116,6 +116,11 @@ export default async function adminProductRoutes(fastify, options) {
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
     const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
+    if (categoryId && !UUID_RE.test(categoryId)) {
+      reply.code(400)
+      return { error: 'Invalid categoryId' }
+    }
+
     const conditions = []
     if (platform) conditions.push(sql`platform = ${platform}`)
     if (categoryId) conditions.push(sql`category_id = ${categoryId}`)

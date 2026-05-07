@@ -1,3 +1,5 @@
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const SORTABLE = {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
@@ -72,6 +74,11 @@ export default async function productRoutes(fastify, options) {
     const sortColumn = SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
 
+    if (categoryId && !UUID_RE.test(categoryId)) {
+      reply.code(400)
+      return { error: 'Invalid categoryId' }
+    }
+
     const conditions = [sql`status = ${status}`]
     if (platform) conditions.push(sql`platform = ${platform}`)
     if (categoryId) conditions.push(sql`category_id = ${categoryId}`)
@@ -116,7 +123,7 @@ export default async function productRoutes(fastify, options) {
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params
 
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!UUID_RE.test(id)) {
       reply.code(404)
       return { error: 'Product not found' }
     }

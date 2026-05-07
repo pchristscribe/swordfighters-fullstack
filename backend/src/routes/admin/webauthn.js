@@ -457,7 +457,9 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'Authentication failed' }
       }
 
-      const newCounter = BigInt(verification.authenticationInfo.newCounter ?? Number(dbCredential.counter))
+      const newCounter = verification.authenticationInfo.newCounter != null
+        ? BigInt(verification.authenticationInfo.newCounter)
+        : dbCredential.counter
       await sql.begin(async sql => {
         await sql`
           update webauthn_credentials
@@ -528,29 +530,44 @@ export default async function webauthnRoutes(fastify, options) {
     }
 
     const trimmedId = id.trim()
+    let notFound = false
+    let isLastKey = false
 
-    const [credential] = await sql`
-      select id from webauthn_credentials
-      where id = ${trimmedId} and admin_id = ${request.session.adminId}
-    `
+    await sql.begin(async sql => {
+      const [credential] = await sql`
+        select id from webauthn_credentials
+        where id = ${trimmedId} and admin_id = ${request.session.adminId}
+        for update
+      `
 
-    if (!credential) {
+      if (!credential) {
+        notFound = true
+        return
+      }
+
+      const [{ count }] = await sql`
+        select count(*)::int as count
+        from webauthn_credentials
+        where admin_id = ${request.session.adminId}
+      `
+
+      if (Number(count) <= 1) {
+        isLastKey = true
+        return
+      }
+
+      await sql`delete from webauthn_credentials where id = ${trimmedId}`
+    })
+
+    if (notFound) {
       reply.code(404)
       return { error: 'Credential not found' }
     }
 
-    const [{ count }] = await sql`
-      select count(*)::int as count
-      from webauthn_credentials
-      where admin_id = ${request.session.adminId}
-    `
-
-    if (count === 1) {
+    if (isLastKey) {
       reply.code(400)
       return { error: 'Cannot delete your last security key' }
     }
-
-    await sql`delete from webauthn_credentials where id = ${trimmedId}`
 
     return { success: true }
   })
