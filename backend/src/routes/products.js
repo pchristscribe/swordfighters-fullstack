@@ -117,6 +117,11 @@ export default async function productRoutes(fastify, options) {
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params;
 
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
+
     const cached = await redis.get(`product:${id}`);
     if (cached) {
       return JSON.parse(cached);
