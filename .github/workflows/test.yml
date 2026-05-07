@@ -108,7 +108,7 @@ jobs:
         env:
           PGPASSWORD: test_password
         run: |
-          for f in $(find ../supabase/migrations -name '*.sql' | sort -V); do
+          for f in $(find ../supabase/migrations -name '*.sql' | sort); do
             psql -h localhost -U swordfighters -d swordfighters_test -f "$f"
           done
 
