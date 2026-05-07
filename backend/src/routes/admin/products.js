@@ -1,9 +1,13 @@
 import { adminAuth } from '../../middleware/adminAuth.js'
 
-// ioredis del does not accept globs — scan and delete matching keys
+// ioredis del does not accept globs — use cursor scan to avoid blocking O(N) KEYS
 async function delPattern(redis, pattern) {
-  const keys = await redis.keys(pattern)
-  if (keys.length) await redis.del(...keys)
+  let cursor = '0'
+  do {
+    const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+    if (keys.length) await redis.del(...keys)
+    cursor = next
+  } while (cursor !== '0')
 }
 
 const SORTABLE = {

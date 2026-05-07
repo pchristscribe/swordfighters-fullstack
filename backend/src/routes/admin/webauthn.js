@@ -270,23 +270,25 @@ export default async function webauthnRoutes(fastify, options) {
         ? deviceName.trim().slice(0, 100) || 'Security Key'
         : 'Security Key'
 
-      await sql`
-        insert into webauthn_credentials ${sql({
-          admin_id: admin.id,
-          credential_id: credentialId,
-          public_key: isoBase64URL.fromBuffer(credentialData.publicKey),
-          counter: BigInt(credentialData.counter ?? 0),
-          device_name: sanitizedDeviceName,
-          transports: credential.response?.transports || []
-        })}
-      `
+      await sql.begin(async sql => {
+        await sql`
+          insert into webauthn_credentials ${sql({
+            admin_id: admin.id,
+            credential_id: credentialId,
+            public_key: isoBase64URL.fromBuffer(credentialData.publicKey),
+            counter: BigInt(credentialData.counter ?? 0),
+            device_name: sanitizedDeviceName,
+            transports: credential.response?.transports || []
+          })}
+        `
 
-      await sql`
-        update admins
-        set current_challenge = null,
-            challenge_expires_at = null
-        where id = ${admin.id}
-      `
+        await sql`
+          update admins
+          set current_challenge = null,
+              challenge_expires_at = null
+          where id = ${admin.id}
+        `
+      })
 
       return {
         verified: true,
@@ -445,20 +447,22 @@ export default async function webauthnRoutes(fastify, options) {
       }
 
       const newCounter = BigInt(verification.authenticationInfo.newCounter ?? Number(dbCredential.counter))
-      await sql`
-        update webauthn_credentials
-        set counter = ${newCounter},
-            last_used_at = ${new Date()}
-        where id = ${dbCredential.id}
-      `
+      await sql.begin(async sql => {
+        await sql`
+          update webauthn_credentials
+          set counter = ${newCounter},
+              last_used_at = ${new Date()}
+          where id = ${dbCredential.id}
+        `
 
-      await sql`
-        update admins
-        set last_login_at = ${new Date()},
-            current_challenge = null,
-            challenge_expires_at = null
-        where id = ${admin.id}
-      `
+        await sql`
+          update admins
+          set last_login_at = ${new Date()},
+              current_challenge = null,
+              challenge_expires_at = null
+          where id = ${admin.id}
+        `
+      })
 
       request.session.adminId = admin.id
 
