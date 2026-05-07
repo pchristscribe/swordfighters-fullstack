@@ -29,14 +29,23 @@ export default async function categoryRoutes(fastify, options) {
   // Get category by ID or slug
   fastify.get('/:identifier', async (request, reply) => {
     const { identifier } = request.params;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier)
 
-    const [row] = await sql`
-      select c.*,
-        (select count(*)::int from products p where p.category_id = c.id) as product_count
-      from categories c
-      where c.id::text = ${identifier} or c.slug = ${identifier}
-      limit 1
-    `;
+    const [row] = isUuid
+      ? await sql`
+          select c.*,
+            (select count(*)::int from products p where p.category_id = c.id) as product_count
+          from categories c
+          where c.id = ${identifier}::uuid
+          limit 1
+        `
+      : await sql`
+          select c.*,
+            (select count(*)::int from products p where p.category_id = c.id) as product_count
+          from categories c
+          where c.slug = ${identifier}
+          limit 1
+        `;
 
     if (!row) {
       reply.code(404);

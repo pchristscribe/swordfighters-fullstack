@@ -1,4 +1,10 @@
-import { adminAuth } from '../../middleware/adminAuth.js';
+import { adminAuth } from '../../middleware/adminAuth.js'
+
+// ioredis del does not accept globs — scan and delete matching keys
+async function delPattern(redis, pattern) {
+  const keys = await redis.keys(pattern)
+  if (keys.length) await redis.del(...keys)
+}
 
 const SORTABLE = {
   createdAt: 'created_at',
@@ -173,7 +179,7 @@ export default async function adminProductRoutes(fastify, options) {
           : Promise.resolve([null])
       ]);
 
-      await redis.del('products:list:*');
+      await delPattern(redis, 'products:list:*')
 
       reply.code(201);
       return { ...created, category: category || null };
@@ -228,7 +234,7 @@ export default async function adminProductRoutes(fastify, options) {
     ]);
 
     await redis.del(`product:${id}`);
-    await redis.del('products:list:*');
+    await delPattern(redis, 'products:list:*')
 
     return {
       ...updated,
@@ -249,7 +255,7 @@ export default async function adminProductRoutes(fastify, options) {
     }
 
     await redis.del(`product:${id}`);
-    await redis.del('products:list:*');
+    await delPattern(redis, 'products:list:*')
 
     reply.code(204);
     return;
@@ -275,7 +281,7 @@ export default async function adminProductRoutes(fastify, options) {
       where id in ${sql(productIds)}
     `;
 
-    await redis.del('products:list:*');
+    await delPattern(redis, 'products:list:*')
     for (const id of productIds) {
       await redis.del(`product:${id}`);
     }
@@ -299,7 +305,7 @@ export default async function adminProductRoutes(fastify, options) {
       delete from products where id in ${sql(productIds)}
     `;
 
-    await redis.del('products:list:*');
+    await delPattern(redis, 'products:list:*')
     for (const id of productIds) {
       await redis.del(`product:${id}`);
     }
