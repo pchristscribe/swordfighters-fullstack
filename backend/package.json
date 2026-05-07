@@ -46,8 +46,4 @@
     "pino-pretty": "^13.1.2",
     "vitest": "^4.0.14"
   },
-  "overrides": {
-    "ofetch": "^1.4.0",
-    "@vercel/nft": "^0.27.4"
-  }
 }

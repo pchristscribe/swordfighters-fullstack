@@ -54,7 +54,7 @@ swordfighters-fullstack/
 - **Linting**: ESLint with typescript-eslint, eslint-plugin-vue
 
 ### Backend API (`backend/`)
-- Runtime: Node.js 20+, Framework: Fastify 5
+- Runtime: Node.js 24+, Framework: Fastify 5
 - Database: PostgreSQL via [`postgres-js`](https://github.com/porsager/postgres) — direct queries against Supabase Postgres. Schema source of truth lives in `supabase/migrations/`. The Fastify instance is decorated with a `sql` client (`fastify.sql`) configured with `transform: postgres.camel` so DB columns are returned as camelCase
 - Sessions: `@fastify/session` + `connect-redis` (Redis-backed)
 - Task Queue: Bull (Redis-backed)

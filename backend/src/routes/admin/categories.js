@@ -53,22 +53,19 @@ export default async function adminCategoryRoutes(fastify, options) {
       ? sql`true`
       : sql`(c.name ilike ${searchPattern} or c.description ilike ${searchPattern})`
 
-    const rows = await sql`
-      select
-        c.*,
-        (select count(*)::int from products p where p.category_id = c.id) as product_count
-      from categories c
-      where ${whereClause}
-      order by ${sql(sortColumn)} ${sortOrder}
-      limit ${parseInt(limit)}
-      offset ${skip}
-    `
-
-    const [{ count }] = await sql`
-      select count(*)::int as count
-      from categories c
-      where ${whereClause}
-    `
+    const [rows, [{ count }]] = await Promise.all([
+      sql`
+        select
+          c.*,
+          (select count(*)::int from products p where p.category_id = c.id) as product_count
+        from categories c
+        where ${whereClause}
+        order by ${sql(sortColumn)} ${sortOrder}
+        limit ${parseInt(limit)}
+        offset ${skip}
+      `,
+      sql`select count(*)::int as count from categories c where ${whereClause}`
+    ])
 
     return {
       categories: rows.map(withCountShape),
@@ -190,7 +187,17 @@ export default async function adminCategoryRoutes(fastify, options) {
       }
     }
 
-    const result = await sql`delete from categories where id = ${id}`
+    let result
+    try {
+      result = await sql`delete from categories where id = ${id}`
+    } catch (error) {
+      // 23503 = FK violation: a product was inserted between the count check and the delete
+      if (error.code === '23503') {
+        reply.code(409)
+        return { error: 'Cannot Delete', message: 'Category has products. Please reassign or delete them first.' }
+      }
+      throw error
+    }
 
     if (result.count === 0) {
       reply.code(404)

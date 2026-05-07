@@ -75,17 +75,16 @@ export default async function adminReviewRoutes(fastify, options) {
       ? sql`true`
       : conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`)
 
-    const reviews = await sql`
-      select * from reviews
-      where ${whereClause}
-      order by ${sql(sortColumn)} ${sortOrder}
-      limit ${parseInt(limit)}
-      offset ${skip}
-    `
-
-    const [{ count: total }] = await sql`
-      select count(*)::int as count from reviews where ${whereClause}
-    `
+    const [reviews, [{ count: total }]] = await Promise.all([
+      sql`
+        select * from reviews
+        where ${whereClause}
+        order by ${sql(sortColumn)} ${sortOrder}
+        limit ${parseInt(limit)}
+        offset ${skip}
+      `,
+      sql`select count(*)::int as count from reviews where ${whereClause}`
+    ])
 
     return {
       reviews: await attachProducts(sql, reviews),

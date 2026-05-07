@@ -224,7 +224,10 @@ export default async function webauthnRoutes(fastify, options) {
         return { error: 'Valid credential object is required' }
       }
 
-      const [admin] = await sql`select * from admins where email = ${email}`
+      const [admin] = await sql`
+        select id, email, name, role, is_active, current_challenge, challenge_expires_at
+        from admins where email = ${email}
+      `
 
       if (!admin || !admin.currentChallenge) {
         reply.code(400)

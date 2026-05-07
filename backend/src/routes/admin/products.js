@@ -5,7 +5,8 @@ async function delPattern(redis, pattern) {
   let cursor = '0'
   do {
     const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
-    if (keys.length) await redis.del(...keys)
+    // ioredis.del accepts an array directly; spreading an unbounded list risks V8 arg limit
+    if (keys.length) await redis.del(keys)
     cursor = next
   } while (cursor !== '0')
 }
@@ -17,30 +18,31 @@ const SORTABLE = {
   rating: 'rating',
   reviewCount: 'review_count',
   title: 'title',
+  // priceUpdatedAt is DB-managed (not API-settable) but sortable
   priceUpdatedAt: 'price_updated_at'
-};
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const PRODUCT_FIELDS = [
   'externalId', 'platform', 'title', 'description', 'imageUrl', 'price',
   'currency', 'status', 'categoryId', 'rating', 'reviewCount', 'tags', 'metadata'
-];
+]
 
 const TO_COLUMN = {
   externalId: 'external_id',
   imageUrl: 'image_url',
   categoryId: 'category_id',
   reviewCount: 'review_count'
-};
+}
 
-const toColumn = (key) => TO_COLUMN[key] || key;
+const toColumn = (key) => TO_COLUMN[key] || key
 
 async function attachRelations(sql, products) {
-  if (products.length === 0) return products;
+  if (products.length === 0) return products
 
-  const categoryIds = [...new Set(products.map(p => p.categoryId).filter(Boolean))];
-  const productIds = products.map(p => p.id);
+  const categoryIds = [...new Set(products.map(p => p.categoryId).filter(Boolean))]
+  const productIds = products.map(p => p.id)
 
   const [categories, links, reviewCounts] = await Promise.all([
     categoryIds.length
@@ -53,27 +55,27 @@ async function attachRelations(sql, products) {
       where product_id in ${sql(productIds)}
       group by product_id
     `
-  ]);
+  ])
 
-  const catMap = new Map(categories.map(c => [c.id, c]));
-  const linksMap = new Map();
+  const catMap = new Map(categories.map(c => [c.id, c]))
+  const linksMap = new Map()
   for (const link of links) {
-    if (!linksMap.has(link.productId)) linksMap.set(link.productId, []);
-    linksMap.get(link.productId).push(link);
+    if (!linksMap.has(link.productId)) linksMap.set(link.productId, [])
+    linksMap.get(link.productId).push(link)
   }
-  const countMap = new Map(reviewCounts.map(r => [r.productId, r.count]));
+  const countMap = new Map(reviewCounts.map(r => [r.productId, r.count]))
 
   return products.map(p => ({
     ...p,
     category: catMap.get(p.categoryId) || null,
     affiliateLinks: linksMap.get(p.id) || [],
     _count: { reviews: countMap.get(p.id) || 0 }
-  }));
+  }))
 }
 
 async function loadProductFull(sql, id) {
-  const [product] = await sql`select * from products where id = ${id}`;
-  if (!product) return null;
+  const [product] = await sql`select * from products where id = ${id}`
+  if (!product) return null
 
   const [[category], links, reviews] = await Promise.all([
     product.categoryId
@@ -81,20 +83,20 @@ async function loadProductFull(sql, id) {
       : Promise.resolve([null]),
     sql`select * from affiliate_links where product_id = ${id}`,
     sql`select * from reviews where product_id = ${id} order by created_at desc`
-  ]);
+  ])
 
   return {
     ...product,
     category: category || null,
     affiliateLinks: links,
     reviews
-  };
+  }
 }
 
 export default async function adminProductRoutes(fastify, options) {
-  const { sql, redis } = fastify;
+  const { sql, redis } = fastify
 
-  fastify.addHook('onRequest', adminAuth);
+  fastify.addHook('onRequest', adminAuth)
 
   // List products
   fastify.get('/', async (request, reply) => {
@@ -107,40 +109,40 @@ export default async function adminProductRoutes(fastify, options) {
       search,
       sortBy = 'createdAt',
       order = 'desc'
-    } = request.query;
+    } = request.query
 
-    const skip = (page - 1) * limit;
-    const sortColumn = SORTABLE[sortBy] || 'created_at';
-    const sortOrder = order === 'asc' ? sql`asc` : sql`desc`;
-    const searchPattern = search ? `%${search}%` : null;
+    const skip = (page - 1) * limit
+    const sortColumn = SORTABLE[sortBy] || 'created_at'
+    const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
+    const searchPattern = search ? `%${search}%` : null
 
-    const conditions = [];
-    if (platform) conditions.push(sql`platform = ${platform}`);
-    if (categoryId) conditions.push(sql`category_id = ${categoryId}`);
-    if (status) conditions.push(sql`status = ${status}`);
+    const conditions = []
+    if (platform) conditions.push(sql`platform = ${platform}`)
+    if (categoryId) conditions.push(sql`category_id = ${categoryId}`)
+    if (status) conditions.push(sql`status = ${status}`)
     if (searchPattern) {
       conditions.push(sql`(
         title ilike ${searchPattern}
         or description ilike ${searchPattern}
         or external_id ilike ${searchPattern}
-      )`);
+      )`)
     }
 
+    // conditions.length === 0 guard keeps reduce safe; sql`true` is the identity element
     const whereClause = conditions.length === 0
       ? sql`true`
-      : conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`);
+      : conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`)
 
-    const products = await sql`
-      select * from products
-      where ${whereClause}
-      order by ${sql(sortColumn)} ${sortOrder}
-      limit ${parseInt(limit)}
-      offset ${skip}
-    `;
-
-    const [{ count: total }] = await sql`
-      select count(*)::int as count from products where ${whereClause}
-    `;
+    const [products, [{ count: total }]] = await Promise.all([
+      sql`
+        select * from products
+        where ${whereClause}
+        order by ${sql(sortColumn)} ${sortOrder}
+        limit ${parseInt(limit)}
+        offset ${skip}
+      `,
+      sql`select count(*)::int as count from products where ${whereClause}`
+    ])
 
     return {
       products: await attachRelations(sql, products),
@@ -150,45 +152,45 @@ export default async function adminProductRoutes(fastify, options) {
         total,
         pages: Math.ceil(total / limit)
       }
-    };
-  });
+    }
+  })
 
   // Get single product
   fastify.get('/:id', async (request, reply) => {
-    const { id } = request.params;
-    const product = await loadProductFull(sql, id);
+    const { id } = request.params
+    const product = await loadProductFull(sql, id)
     if (!product) {
-      reply.code(404);
-      return { error: 'Product not found' };
+      reply.code(404)
+      return { error: 'Product not found' }
     }
-    return product;
-  });
+    return product
+  })
 
   // Create product
   fastify.post('/', async (request, reply) => {
-    const data = request.body;
+    const data = request.body
     const insertObj = Object.fromEntries(
       PRODUCT_FIELDS
         .filter(k => data[k] !== undefined)
         .map(k => [toColumn(k), data[k]])
-    );
+    )
 
     try {
       const [created] = await sql`
         insert into products ${sql(insertObj)}
         returning *
-      `;
+      `
 
       const [[category]] = await Promise.all([
         created.categoryId
           ? sql`select * from categories where id = ${created.categoryId}`
           : Promise.resolve([null])
-      ]);
+      ])
 
       await delPattern(redis, 'products:list:*')
 
-      reply.code(201);
-      return { ...created, category: category || null };
+      reply.code(201)
+      return { ...created, category: category || null }
     } catch (error) {
       if (error.code === '23505') {
         reply.code(409)
@@ -203,35 +205,36 @@ export default async function adminProductRoutes(fastify, options) {
       }
       throw error
     }
-  });
+  })
 
   // Update product
   fastify.patch('/:id', async (request, reply) => {
-    const { id } = request.params;
-    const data = request.body;
+    const { id } = request.params
+    const data = request.body
     const updateObj = Object.fromEntries(
       PRODUCT_FIELDS
         .filter(k => data[k] !== undefined)
         .map(k => [toColumn(k), data[k]])
-    );
+    )
 
     if (Object.keys(updateObj).length === 0) {
-      const product = await loadProductFull(sql, id);
+      const product = await loadProductFull(sql, id)
       if (!product) {
-        reply.code(404);
-        return { error: 'Product not found' };
+        reply.code(404)
+        return { error: 'Product not found' }
       }
-      return product;
+      return product
     }
 
     let updated
     try {
-      ;[updated] = await sql`
+      const rows = await sql`
         update products
         set ${sql(updateObj)}
         where id = ${id}
         returning *
       `
+      updated = rows[0]
     } catch (error) {
       if (error.code === '23503') {
         reply.code(422)
@@ -264,25 +267,25 @@ export default async function adminProductRoutes(fastify, options) {
 
   // Delete product
   fastify.delete('/:id', async (request, reply) => {
-    const { id } = request.params;
+    const { id } = request.params
 
-    const result = await sql`delete from products where id = ${id}`;
+    const result = await sql`delete from products where id = ${id}`
 
     if (result.count === 0) {
-      reply.code(404);
-      return { error: 'Product not found' };
+      reply.code(404)
+      return { error: 'Product not found' }
     }
 
-    await redis.del(`product:${id}`);
+    await redis.del(`product:${id}`)
     await delPattern(redis, 'products:list:*')
 
-    reply.code(204);
-    return;
-  });
+    reply.code(204)
+    return
+  })
 
   // Bulk update status
   fastify.post('/bulk/status', async (request, reply) => {
-    const { productIds, status } = request.body;
+    const { productIds, status } = request.body
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
       reply.code(400)
@@ -295,30 +298,30 @@ export default async function adminProductRoutes(fastify, options) {
     }
 
     if (!['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK'].includes(status)) {
-      reply.code(400);
-      return { error: 'Invalid status value' };
+      reply.code(400)
+      return { error: 'Invalid status value' }
     }
 
     const result = await sql`
       update products
       set status = ${status}
       where id in ${sql(productIds)}
-    `;
+    `
 
     await delPattern(redis, 'products:list:*')
     for (const id of productIds) {
-      await redis.del(`product:${id}`);
+      await redis.del(`product:${id}`)
     }
 
     return {
       success: true,
       updated: result.count
-    };
-  });
+    }
+  })
 
   // Bulk delete
   fastify.post('/bulk/delete', async (request, reply) => {
-    const { productIds } = request.body;
+    const { productIds } = request.body
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
       reply.code(400)
@@ -332,18 +335,18 @@ export default async function adminProductRoutes(fastify, options) {
 
     const result = await sql`
       delete from products where id in ${sql(productIds)}
-    `;
+    `
 
     await delPattern(redis, 'products:list:*')
     for (const id of productIds) {
-      await redis.del(`product:${id}`);
+      await redis.del(`product:${id}`)
     }
 
     return {
       success: true,
       deleted: result.count
-    };
-  });
+    }
+  })
 
   // Dashboard stats
   fastify.get('/stats/dashboard', async (request, reply) => {
@@ -361,7 +364,7 @@ export default async function adminProductRoutes(fastify, options) {
       sql`select count(*)::int as count from categories`,
       sql`select count(*)::int as count from reviews`,
       sql`select * from products order by created_at desc limit 5`
-    ]);
+    ])
 
     return {
       stats: {
@@ -373,6 +376,6 @@ export default async function adminProductRoutes(fastify, options) {
         totalReviews
       },
       recentProducts: await attachRelations(sql, recentProducts)
-    };
-  });
+    }
+  })
 }
