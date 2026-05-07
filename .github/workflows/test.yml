@@ -104,11 +104,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma client
-        run: npx prisma generate
-
-      - name: Run database migrations
-        run: npx prisma migrate deploy
+      - name: Apply database migrations
+        env:
+          PGPASSWORD: test_password
+        run: |
+          for f in $(ls -1v ../supabase/migrations/*.sql); do
+            psql -h localhost -U swordfighters -d swordfighters_test -f "$f"
+          done
 
       - name: Run tests
         run: npm test
