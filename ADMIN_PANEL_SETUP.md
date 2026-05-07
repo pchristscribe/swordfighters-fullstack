@@ -63,7 +63,31 @@ npm install
 npm run dev   # runs on http://localhost:3002
 ```
 
-### 5. Register Your First Security Key
+### 5. Bootstrap the First Admin Account
+
+The backend blocks auto-creation of admin accounts in production (prevents arbitrary callers from claiming superadmin access). Before you can log in to a fresh production environment, you need at least one row in the `admins` table.
+
+**Option A — psql one-liner (recommended)**
+
+```bash
+psql "$DATABASE_URL" -c "
+  INSERT INTO admins (email, name, role, is_active)
+  VALUES ('your-email@example.com', 'Your Name', 'admin', true)
+  ON CONFLICT (email) DO NOTHING;
+"
+```
+
+**Option B — Railway console**
+
+Open the Railway dashboard → your backend service → **Connect** → run the same SQL in the query console.
+
+After inserting the row, proceed to register your security key (step 6 below). The `/register/options` endpoint will find the row and return a WebAuthn challenge.
+
+> **Local development**: The backend auto-creates the admin row when `NODE_ENV` is not `production`, so no manual step is needed for local dev.
+
+---
+
+### 6. Register Your First Security Key
 
 1. Open **http://localhost:3002**
 2. Click **"Register Security Key"**

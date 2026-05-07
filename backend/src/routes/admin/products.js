@@ -1,4 +1,5 @@
 import { adminAuth } from '../../middleware/adminAuth.js'
+import { attachRelations } from '../../utils/relations.js'
 
 // ioredis del does not accept globs — use cursor scan to avoid blocking O(N) KEYS
 async function delPattern(redis, pattern) {
@@ -38,40 +39,6 @@ const TO_COLUMN = {
 
 const toColumn = (key) => TO_COLUMN[key] || key
 
-async function attachRelations(sql, products) {
-  if (products.length === 0) return products
-
-  const categoryIds = [...new Set(products.map(p => p.categoryId).filter(Boolean))]
-  const productIds = products.map(p => p.id)
-
-  const [categories, links, reviewCounts] = await Promise.all([
-    categoryIds.length
-      ? sql`select * from categories where id in ${sql(categoryIds)}`
-      : Promise.resolve([]),
-    sql`select * from affiliate_links where product_id in ${sql(productIds)}`,
-    sql`
-      select product_id, count(*)::int as count
-      from reviews
-      where product_id in ${sql(productIds)}
-      group by product_id
-    `
-  ])
-
-  const catMap = new Map(categories.map(c => [c.id, c]))
-  const linksMap = new Map()
-  for (const link of links) {
-    if (!linksMap.has(link.productId)) linksMap.set(link.productId, [])
-    linksMap.get(link.productId).push(link)
-  }
-  const countMap = new Map(reviewCounts.map(r => [r.productId, r.count]))
-
-  return products.map(p => ({
-    ...p,
-    category: catMap.get(p.categoryId) || null,
-    affiliateLinks: linksMap.get(p.id) || [],
-    _count: { reviews: countMap.get(p.id) || 0 }
-  }))
-}
 
 async function loadProductFull(sql, id) {
   const [product] = await sql`select * from products where id = ${id}`
@@ -143,7 +110,7 @@ export default async function adminProductRoutes(fastify, options) {
         select * from products
         where ${whereClause}
         order by ${sql(sortColumn)} ${sortOrder}
-        limit ${parseInt(limit)}
+        limit ${parseInt(limit, 10)}
         offset ${skip}
       `,
       sql`select count(*)::int as count from products where ${whereClause}`
@@ -152,8 +119,8 @@ export default async function adminProductRoutes(fastify, options) {
     return {
       products: await attachRelations(sql, products),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
         total,
         pages: Math.ceil(total / limit)
       }

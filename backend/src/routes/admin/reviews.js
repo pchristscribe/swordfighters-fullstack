@@ -67,7 +67,7 @@ export default async function adminReviewRoutes(fastify, options) {
     const conditions = []
     if (productId) conditions.push(sql`product_id = ${productId}`)
     if (isFeatured !== undefined) conditions.push(sql`is_featured = ${isFeatured === 'true'}`)
-    if (rating) conditions.push(sql`rating = ${parseInt(rating)}`)
+    if (rating) conditions.push(sql`rating = ${parseInt(rating, 10)}`)
     if (searchPattern) {
       conditions.push(sql`(
         content ilike ${searchPattern}
@@ -85,7 +85,7 @@ export default async function adminReviewRoutes(fastify, options) {
         select * from reviews
         where ${whereClause}
         order by ${sql(sortColumn)} ${sortOrder}
-        limit ${parseInt(limit)}
+        limit ${parseInt(limit, 10)}
         offset ${skip}
       `,
       sql`select count(*)::int as count from reviews where ${whereClause}`
@@ -94,8 +94,8 @@ export default async function adminReviewRoutes(fastify, options) {
     return {
       reviews: await attachProducts(sql, reviews),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
         total,
         pages: Math.ceil(total / limit)
       }

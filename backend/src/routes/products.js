@@ -1,3 +1,5 @@
+import { attachRelations } from '../utils/relations.js'
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const SORTABLE = {
@@ -7,50 +9,6 @@ const SORTABLE = {
   rating: 'rating',
   reviewCount: 'review_count',
   title: 'title'
-}
-
-async function attachRelations(sql, products, { latestLinkOnly = false } = {}) {
-  if (products.length === 0) return products
-
-  const categoryIds = [...new Set(products.map(p => p.categoryId).filter(Boolean))]
-  const productIds = products.map(p => p.id)
-
-  const linksQuery = latestLinkOnly
-    ? sql`
-        select distinct on (product_id) *
-        from affiliate_links
-        where product_id in ${sql(productIds)}
-        order by product_id, created_at desc
-      `
-    : sql`select * from affiliate_links where product_id in ${sql(productIds)}`
-
-  const [categories, links, reviewCounts] = await Promise.all([
-    categoryIds.length
-      ? sql`select * from categories where id in ${sql(categoryIds)}`
-      : Promise.resolve([]),
-    linksQuery,
-    sql`
-      select product_id, count(*)::int as count
-      from reviews
-      where product_id in ${sql(productIds)}
-      group by product_id
-    `
-  ])
-
-  const catMap = new Map(categories.map(c => [c.id, c]))
-  const linksMap = new Map()
-  for (const link of links) {
-    if (!linksMap.has(link.productId)) linksMap.set(link.productId, [])
-    linksMap.get(link.productId).push(link)
-  }
-  const countMap = new Map(reviewCounts.map(r => [r.productId, r.count]))
-
-  return products.map(p => ({
-    ...p,
-    category: catMap.get(p.categoryId) || null,
-    affiliateLinks: linksMap.get(p.id) || [],
-    _count: { reviews: countMap.get(p.id) || 0 }
-  }))
 }
 
 export default async function productRoutes(fastify, options) {
@@ -85,6 +43,7 @@ export default async function productRoutes(fastify, options) {
     if (minPrice) conditions.push(sql`price >= ${parseFloat(minPrice)}`)
     if (maxPrice) conditions.push(sql`price <= ${parseFloat(maxPrice)}`)
 
+    // conditions always has at least the status element, so reduce is safe without an empty-array guard
     const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`)
 
     const cacheKey = `products:list:${JSON.stringify({ platform, categoryId, status, page, limit, minPrice, maxPrice, sortBy, order })}`
@@ -98,7 +57,7 @@ export default async function productRoutes(fastify, options) {
         select * from products
         where ${whereClause}
         order by ${sql(sortColumn)} ${sortOrder}
-        limit ${parseInt(limit)}
+        limit ${parseInt(limit, 10)}
         offset ${skip}
       `,
       sql`select count(*)::int as count from products where ${whereClause}`
@@ -107,8 +66,8 @@ export default async function productRoutes(fastify, options) {
     const result = {
       products: await attachRelations(sql, products, { latestLinkOnly: true }),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
         total,
         pages: Math.ceil(total / limit)
       }

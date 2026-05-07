@@ -65,7 +65,7 @@ export default async function adminCategoryRoutes(fastify, options) {
         from categories c
         where ${whereClause}
         order by ${sql(sortColumn)} ${sortOrder}
-        limit ${parseInt(limit)}
+        limit ${parseInt(limit, 10)}
         offset ${skip}
       `,
       sql`select count(*)::int as count from categories c where ${whereClause}`
@@ -74,8 +74,8 @@ export default async function adminCategoryRoutes(fastify, options) {
     return {
       categories: rows.map(withCountShape),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
         total: count,
         pages: Math.ceil(count / limit)
       }

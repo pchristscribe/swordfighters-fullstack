@@ -8,9 +8,6 @@ RUN npm ci --omit=dev
 # Copy source
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
-
 # ── API server ────────────────────────────────────────────────────────────
 FROM base AS api
 EXPOSE 3001
