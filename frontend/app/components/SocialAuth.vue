@@ -27,11 +27,13 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script lang="ts">
+import { defineComponent, h } from 'vue'
 import type { Provider } from '@supabase/supabase-js'
 
 // ---------------------------------------------------------------------------
-// Provider icon components (inline SVGs to avoid external dependencies)
+// Provider icon components — defined at module scope so withDefaults can
+// reference them (defineProps is hoisted outside setup() by the compiler)
 // ---------------------------------------------------------------------------
 
 const GoogleIcon = defineComponent({
@@ -77,26 +79,30 @@ const DiscordIcon = defineComponent({
   },
 })
 
-// ---------------------------------------------------------------------------
-// Props & setup
-// ---------------------------------------------------------------------------
-
 export interface OAuthProvider {
   id: Provider
   label: string
   icon: ReturnType<typeof defineComponent>
 }
 
+export const defaultProviders: OAuthProvider[] = [
+  { id: 'google' as Provider, label: 'Google', icon: GoogleIcon },
+  { id: 'github' as Provider, label: 'GitHub', icon: GitHubIcon },
+  { id: 'discord' as Provider, label: 'Discord', icon: DiscordIcon },
+]
+</script>
+
+<script setup lang="ts">
+// ---------------------------------------------------------------------------
+// Props & setup
+// ---------------------------------------------------------------------------
+
 const props = withDefaults(
   defineProps<{
     providers?: OAuthProvider[]
   }>(),
   {
-    providers: () => [
-      { id: 'google' as Provider, label: 'Google', icon: GoogleIcon },
-      { id: 'github' as Provider, label: 'GitHub', icon: GitHubIcon },
-      { id: 'discord' as Provider, label: 'Discord', icon: DiscordIcon },
-    ],
+    providers: () => defaultProviders,
   }
 )
 
