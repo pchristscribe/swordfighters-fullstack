@@ -57,7 +57,7 @@ export default async function adminReviewRoutes(fastify, options) {
     const skip = (page - 1) * limit
     const sortColumn = SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
-    const searchPattern = search ? `%${search}%` : null
+    const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
     const conditions = []
     if (productId) conditions.push(sql`product_id = ${productId}`)
@@ -101,6 +101,11 @@ export default async function adminReviewRoutes(fastify, options) {
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params
 
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Review not found' }
+    }
+
     const [review] = await sql`select * from reviews where id = ${id}`
     if (!review) {
       reply.code(404)
@@ -141,6 +146,10 @@ export default async function adminReviewRoutes(fastify, options) {
   // Update review
   fastify.patch('/:id', { schema: updateReviewSchema }, async (request, reply) => {
     const { id } = request.params
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Review not found' }
+    }
     const data = request.body
     const updateObj = Object.fromEntries(
       REVIEW_FIELDS
@@ -178,8 +187,13 @@ export default async function adminReviewRoutes(fastify, options) {
   fastify.delete('/:id', { schema: deleteReviewSchema }, async (request, reply) => {
     const { id } = request.params
 
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Review not found' }
+    }
+
     const result = await sql`delete from reviews where id = ${id}`
-    if (result.count === 0) {
+    if (Number(result.count) === 0) {
       reply.code(404)
       return { error: 'Review not found' }
     }
@@ -191,6 +205,11 @@ export default async function adminReviewRoutes(fastify, options) {
   // Toggle featured
   fastify.post('/:id/toggle-featured', async (request, reply) => {
     const { id } = request.params
+
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Review not found' }
+    }
 
     const [updated] = await sql`
       update reviews

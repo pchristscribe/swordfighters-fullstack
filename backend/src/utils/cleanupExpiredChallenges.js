@@ -21,16 +21,18 @@ export async function cleanupExpiredChallenges(sql, logger = console) {
           challenge_expires_at = null
       where current_challenge is not null
         and challenge_expires_at <= now()
-    `;
+    `
 
-    if (result.count > 0) {
-      logger.info({ count: result.count }, 'Cleaned up expired challenges')
+    // postgres-js returns count as a string from the pg wire protocol command tag
+    const count = Number(result.count)
+    if (count > 0) {
+      logger.info({ count }, 'Cleaned up expired challenges')
     }
 
-    return result.count;
+    return count
   } catch (error) {
     logger.error({ error: error.message }, 'Error cleaning up expired challenges')
-    throw error;
+    throw error
   }
 }
 
@@ -41,11 +43,11 @@ export async function cleanupExpiredChallenges(sql, logger = console) {
  */
 export function isValidChallenge(admin) {
   if (!admin.currentChallenge || !admin.challengeExpiresAt) {
-    return false;
+    return false
   }
 
-  const now = new Date();
-  return admin.challengeExpiresAt > now;
+  const now = new Date()
+  return admin.challengeExpiresAt > now
 }
 
 /**
@@ -53,12 +55,12 @@ export function isValidChallenge(admin) {
  * Usage: fastify.addHook('onRequest', cleanupMiddleware)
  */
 export function cleanupMiddleware(request, reply, done) {
-  const { sql, log } = request.server;
+  const { sql, log } = request.server
 
   // Run cleanup asynchronously without blocking the request
   cleanupExpiredChallenges(sql, log).catch(error => {
-    log.error({ error: error.message }, 'Background cleanup failed');
-  });
+    log.error({ error: error.message }, 'Background cleanup failed')
+  })
 
-  done();
+  done()
 }

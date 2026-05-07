@@ -114,7 +114,7 @@ export default async function adminProductRoutes(fastify, options) {
     const skip = (page - 1) * limit
     const sortColumn = SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
-    const searchPattern = search ? `%${search}%` : null
+    const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
     const conditions = []
     if (platform) conditions.push(sql`platform = ${platform}`)
@@ -158,6 +158,10 @@ export default async function adminProductRoutes(fastify, options) {
   // Get single product
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
     const product = await loadProductFull(sql, id)
     if (!product) {
       reply.code(404)
@@ -210,6 +214,10 @@ export default async function adminProductRoutes(fastify, options) {
   // Update product
   fastify.patch('/:id', async (request, reply) => {
     const { id } = request.params
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
     const data = request.body
     const updateObj = Object.fromEntries(
       PRODUCT_FIELDS
@@ -269,9 +277,14 @@ export default async function adminProductRoutes(fastify, options) {
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params
 
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
+
     const result = await sql`delete from products where id = ${id}`
 
-    if (result.count === 0) {
+    if (Number(result.count) === 0) {
       reply.code(404)
       return { error: 'Product not found' }
     }

@@ -16,9 +16,11 @@ if (!connectionString) {
   throw new Error('DATABASE_URL is not set')
 }
 
+const poolMax = parseInt(process.env.PG_POOL_MAX, 10)
+
 const sql = postgres(connectionString, {
   transform: postgres.camel,
-  max: parseInt(process.env.PG_POOL_MAX, 10) || 10,
+  max: Number.isNaN(poolMax) ? 10 : poolMax,
   idle_timeout: 20,
   max_lifetime: 60 * 30,
   connect_timeout: 10,

@@ -77,10 +77,10 @@ out/
 *.pid.lock
 .eslintcache
 
-# Root-level Bun exploration files
+# Bun lock files (not used by this project — npm is the package manager)
 /index.ts
 /tsconfig.json
-/bun.lock
+bun.lock
 
 # AI developer scratchpad notes
 .specs/

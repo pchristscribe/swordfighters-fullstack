@@ -51,7 +51,7 @@ export default async function adminCategoryRoutes(fastify, options) {
     const skip = (page - 1) * limit
     const sortColumn = SORTABLE[sortBy] || 'name'
     const sortOrder = order === 'desc' ? sql`desc` : sql`asc`
-    const searchPattern = search ? `%${search}%` : null
+    const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
     const whereClause = searchPattern === null
       ? sql`true`
@@ -85,6 +85,11 @@ export default async function adminCategoryRoutes(fastify, options) {
   // Get single category
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params
+
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Category not found' }
+    }
 
     const [row] = await sql`
       select
@@ -133,6 +138,10 @@ export default async function adminCategoryRoutes(fastify, options) {
   // Update category
   fastify.patch('/:id', { schema: updateCategorySchema }, async (request, reply) => {
     const { id } = request.params
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Category not found' }
+    }
     const data = request.body
     const updateObj = Object.fromEntries(
       CATEGORY_WRITEABLE_FIELDS
@@ -179,6 +188,11 @@ export default async function adminCategoryRoutes(fastify, options) {
   fastify.delete('/:id', { schema: deleteCategorySchema }, async (request, reply) => {
     const { id } = request.params
 
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Category not found' }
+    }
+
     const [{ count: productsCount }] = await sql`
       select count(*)::int as count from products where category_id = ${id}
     `
@@ -203,7 +217,7 @@ export default async function adminCategoryRoutes(fastify, options) {
       throw error
     }
 
-    if (result.count === 0) {
+    if (Number(result.count) === 0) {
       reply.code(404)
       return { error: 'Category not found' }
     }
