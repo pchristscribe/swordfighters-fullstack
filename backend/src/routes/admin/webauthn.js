@@ -89,7 +89,10 @@ const authenticateVerifySchema = {
 }
 
 async function loadAdminByEmail(sql, email) {
-  const [admin] = await sql`select * from admins where email = ${email}`
+  const [admin] = await sql`
+    select id, email, name, role, is_active, current_challenge, challenge_expires_at
+    from admins where email = ${email}
+  `
   if (!admin) return null
   const credentials = await sql`
     select * from webauthn_credentials where admin_id = ${admin.id}

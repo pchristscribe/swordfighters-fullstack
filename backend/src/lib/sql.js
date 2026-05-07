@@ -18,12 +18,12 @@ if (!connectionString) {
 
 const sql = postgres(connectionString, {
   transform: postgres.camel,
-  max: Number(process.env.PG_POOL_MAX ?? 10),
+  max: parseInt(process.env.PG_POOL_MAX, 10) || 10,
   idle_timeout: 20,
   max_lifetime: 60 * 30,
   connect_timeout: 10,
   prepare: false, // Supabase pooler runs in transaction mode; prepared statements aren't supported
-  onnotice: () => {}
+  onnotice: process.env.NODE_ENV === 'production' ? () => {} : undefined
 })
 
 export default sql

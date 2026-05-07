@@ -189,13 +189,17 @@ export default async function adminProductRoutes(fastify, options) {
       return { ...created, category: category || null };
     } catch (error) {
       if (error.code === '23505') {
-        reply.code(409);
+        reply.code(409)
         return {
           error: 'Conflict',
           message: 'Product with this platform and external ID already exists'
-        };
+        }
       }
-      throw error;
+      if (error.code === '23503') {
+        reply.code(422)
+        return { error: 'Referenced category does not exist' }
+      }
+      throw error
     }
   });
 
@@ -218,16 +222,25 @@ export default async function adminProductRoutes(fastify, options) {
       return product;
     }
 
-    const [updated] = await sql`
-      update products
-      set ${sql(updateObj)}
-      where id = ${id}
-      returning *
-    `;
+    let updated
+    try {
+      ;[updated] = await sql`
+        update products
+        set ${sql(updateObj)}
+        where id = ${id}
+        returning *
+      `
+    } catch (error) {
+      if (error.code === '23503') {
+        reply.code(422)
+        return { error: 'Referenced category does not exist' }
+      }
+      throw error
+    }
 
     if (!updated) {
-      reply.code(404);
-      return { error: 'Product not found' };
+      reply.code(404)
+      return { error: 'Product not found' }
     }
 
     const [[category], links] = await Promise.all([
@@ -235,17 +248,17 @@ export default async function adminProductRoutes(fastify, options) {
         ? sql`select * from categories where id = ${updated.categoryId}`
         : Promise.resolve([null]),
       sql`select * from affiliate_links where product_id = ${id}`
-    ]);
+    ])
 
-    await redis.del(`product:${id}`);
+    await redis.del(`product:${id}`)
     await delPattern(redis, 'products:list:*')
 
     return {
       ...updated,
       category: category || null,
       affiliateLinks: links
-    };
-  });
+    }
+  })
 
   // Delete product
   fastify.delete('/:id', async (request, reply) => {

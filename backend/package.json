@@ -39,7 +39,6 @@
     "dotenv": "^17.2.3",
     "fastify": "^5.8.5",
     "ioredis": "^5.9.3",
-    "node": "^25.8.2",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
@@ -50,5 +49,5 @@
   "overrides": {
     "ofetch": "^1.4.0",
     "@vercel/nft": "^0.27.4"
-}
+  }
 }

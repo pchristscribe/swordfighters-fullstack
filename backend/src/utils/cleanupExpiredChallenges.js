@@ -24,12 +24,12 @@ export async function cleanupExpiredChallenges(sql, logger = console) {
     `;
 
     if (result.count > 0) {
-      logger.info({ count: result.count }, '🧹 Cleaned up expired challenges');
+      logger.info({ count: result.count }, 'Cleaned up expired challenges')
     }
 
     return result.count;
   } catch (error) {
-    logger.error({ error: error.message }, '❌ Error cleaning up expired challenges');
+    logger.error({ error: error.message }, 'Error cleaning up expired challenges')
     throw error;
   }
 }
