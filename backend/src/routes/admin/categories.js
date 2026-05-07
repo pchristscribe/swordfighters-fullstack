@@ -15,7 +15,11 @@ const SORTABLE = {
   updatedAt: 'updated_at'
 }
 
-const CATEGORY_INSERT_FIELDS = ['name', 'slug', 'description', 'imageUrl']
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// updated_at is maintained by the categories_updated_at BEFORE UPDATE trigger
+// defined in supabase/migrations/001_initial_schema.sql — no need to include it here
+const CATEGORY_WRITEABLE_FIELDS = ['name', 'slug', 'description', 'imageUrl']
 const TO_COLUMN = {
   imageUrl: 'image_url'
 }
@@ -102,7 +106,7 @@ export default async function adminCategoryRoutes(fastify, options) {
   fastify.post('/', { schema: createCategorySchema }, async (request, reply) => {
     const data = request.body
     const insertObj = Object.fromEntries(
-      CATEGORY_INSERT_FIELDS
+      CATEGORY_WRITEABLE_FIELDS
         .filter(k => data[k] !== undefined)
         .map(k => [toColumn(k), data[k]])
     )
@@ -131,7 +135,7 @@ export default async function adminCategoryRoutes(fastify, options) {
     const { id } = request.params
     const data = request.body
     const updateObj = Object.fromEntries(
-      CATEGORY_INSERT_FIELDS
+      CATEGORY_WRITEABLE_FIELDS
         .filter(k => data[k] !== undefined)
         .map(k => [toColumn(k), data[k]])
     )
@@ -213,7 +217,13 @@ export default async function adminCategoryRoutes(fastify, options) {
     const { categoryIds } = request.body
 
     if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
-      return { success: true, deleted: 0, message: 'Successfully deleted 0 categories' }
+      reply.code(400)
+      return { error: 'categoryIds array is required' }
+    }
+
+    if (categoryIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid category ID format' }
     }
 
     const blocking = await sql`
