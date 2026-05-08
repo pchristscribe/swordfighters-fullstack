@@ -48,7 +48,8 @@ export default async function adminCategoryRoutes(fastify, options) {
       order = 'asc'
     } = request.query
 
-    const skip = (page - 1) * limit
+    const safeLimit = Math.min(parseInt(limit, 10) || 50, 200)
+    const skip = (parseInt(page, 10) - 1) * safeLimit
     const sortColumn = SORTABLE[sortBy] || 'name'
     const sortOrder = order === 'desc' ? sql`desc` : sql`asc`
     const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
@@ -65,7 +66,7 @@ export default async function adminCategoryRoutes(fastify, options) {
         from categories c
         where ${whereClause}
         order by ${sql(sortColumn)} ${sortOrder}
-        limit ${parseInt(limit, 10)}
+        limit ${safeLimit}
         offset ${skip}
       `,
       sql`select count(*)::int as count from categories c where ${whereClause}`
@@ -75,9 +76,9 @@ export default async function adminCategoryRoutes(fastify, options) {
       categories: rows.map(withCountShape),
       pagination: {
         page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
+        limit: safeLimit,
         total: count,
-        pages: Math.ceil(count / limit)
+        pages: Math.ceil(count / safeLimit)
       }
     }
   })

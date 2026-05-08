@@ -13,6 +13,15 @@ describe('cleanupExpiredChallenges', () => {
     expect(count).toBe(3);
     expect(sql).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith({ count: 3 }, expect.stringContaining('Cleaned up'));
+
+    // Verify the SQL targets the correct table and both columns
+    // sql is called as a tagged template: sql`...` → sql(strings, ...values)
+    // mock.calls[0][0] is the frozen TemplateStringsArray of the query
+    const sqlFragment = sql.mock.calls[0][0].join('');
+    expect(sqlFragment).toMatch(/update\s+admins/i);
+    expect(sqlFragment).toMatch(/current_challenge\s*=\s*null/i);
+    expect(sqlFragment).toMatch(/challenge_expires_at\s*=\s*null/i);
+    expect(sqlFragment).toMatch(/challenge_expires_at\s*<=\s*now\(\)/i);
   });
 
   it('returns 0 and skips logging when nothing was cleaned up', async () => {

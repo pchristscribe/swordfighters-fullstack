@@ -54,7 +54,8 @@ export default async function adminReviewRoutes(fastify, options) {
       order = 'desc'
     } = request.query
 
-    const skip = (page - 1) * limit
+    const safeLimit = Math.min(parseInt(limit, 10) || 20, 100)
+    const skip = (parseInt(page, 10) - 1) * safeLimit
     const sortColumn = SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
     const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
@@ -85,7 +86,7 @@ export default async function adminReviewRoutes(fastify, options) {
         select * from reviews
         where ${whereClause}
         order by ${sql(sortColumn)} ${sortOrder}
-        limit ${parseInt(limit, 10)}
+        limit ${safeLimit}
         offset ${skip}
       `,
       sql`select count(*)::int as count from reviews where ${whereClause}`
@@ -95,9 +96,9 @@ export default async function adminReviewRoutes(fastify, options) {
       reviews: await attachProducts(sql, reviews),
       pagination: {
         page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
+        limit: safeLimit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / safeLimit)
       }
     }
   })
