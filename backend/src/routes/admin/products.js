@@ -157,11 +157,9 @@ export default async function adminProductRoutes(fastify, options) {
         returning *
       `
 
-      const [[category]] = await Promise.all([
-        created.categoryId
-          ? sql`select * from categories where id = ${created.categoryId}`
-          : Promise.resolve([null])
-      ])
+      const [category] = created.categoryId
+        ? await sql`select * from categories where id = ${created.categoryId}`
+        : [null]
 
       await delPattern(redis, 'products:list:*')
 

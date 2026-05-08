@@ -18,6 +18,10 @@ if (!connectionString) {
 
 const poolMax = parseInt(process.env.PG_POOL_MAX, 10)
 
+// WARNING: postgres-js maps Postgres BIGINT columns (e.g. webauthn_credentials.counter)
+// to JavaScript BigInt. JSON.stringify throws TypeError on BigInt values, so never
+// spread a credential row directly into an HTTP response. Use Number(row.counter)
+// at the call site, or add a value transform here if BigInt columns proliferate.
 const sql = postgres(connectionString, {
   transform: postgres.camel,
   max: Number.isNaN(poolMax) ? 10 : poolMax,

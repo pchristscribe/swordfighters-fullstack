@@ -8,6 +8,7 @@ pnpm-debug.log*
 .yarn
 .pnp.*
 .vercel/
+.codemap/
 
 # Nuxt
 .nuxt
