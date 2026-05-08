@@ -6,6 +6,7 @@ import {
 } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import { isValidChallenge } from '../../utils/cleanupExpiredChallenges.js'
+import { UUID_RE } from '../../utils/constants.js'
 
 const RP_NAME = 'Swordfighters Admin'
 const RP_ID = process.env.NODE_ENV === 'production'
@@ -14,8 +15,6 @@ const RP_ID = process.env.NODE_ENV === 'production'
 const ORIGIN = process.env.NODE_ENV === 'production'
   ? process.env.ADMIN_URL || 'https://admin.swordfighters.com'
   : 'http://localhost:3002'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // Email validation regex - RFC 5322 simplified
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

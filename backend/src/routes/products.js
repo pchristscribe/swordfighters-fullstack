@@ -1,15 +1,5 @@
 import { attachRelations } from '../utils/relations.js'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const SORTABLE = {
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  price: 'price',
-  rating: 'rating',
-  reviewCount: 'review_count',
-  title: 'title'
-}
+import { UUID_RE, SORTABLE, VALID_PLATFORMS, VALID_STATUSES } from '../utils/constants.js'
 
 export default async function productRoutes(fastify, options) {
   const { sql, redis } = fastify
@@ -38,6 +28,16 @@ export default async function productRoutes(fastify, options) {
     if (categoryId && !UUID_RE.test(categoryId)) {
       reply.code(400)
       return { error: 'Invalid categoryId' }
+    }
+
+    if (!VALID_STATUSES.includes(safeStatus)) {
+      reply.code(400)
+      return { error: 'Invalid status' }
+    }
+
+    if (platform && !VALID_PLATFORMS.includes(platform)) {
+      reply.code(400)
+      return { error: 'Invalid platform' }
     }
 
     const conditions = [sql`status = ${safeStatus}`]

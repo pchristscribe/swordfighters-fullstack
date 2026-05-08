@@ -1,5 +1,6 @@
 import { adminAuth } from '../../middleware/adminAuth.js'
 import { attachRelations } from '../../utils/relations.js'
+import { UUID_RE, ADMIN_SORTABLE, VALID_PLATFORMS, VALID_STATUSES } from '../../utils/constants.js'
 
 // ioredis del does not accept globs — use cursor scan to avoid blocking O(N) KEYS
 async function delPattern(redis, pattern) {
@@ -11,19 +12,6 @@ async function delPattern(redis, pattern) {
     cursor = next
   } while (cursor !== '0')
 }
-
-const SORTABLE = {
-  createdAt: 'created_at',
-  updatedAt: 'updated_at',
-  price: 'price',
-  rating: 'rating',
-  reviewCount: 'review_count',
-  title: 'title',
-  // priceUpdatedAt is DB-managed (not API-settable) but sortable
-  priceUpdatedAt: 'price_updated_at'
-}
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const PRODUCT_FIELDS = [
   'externalId', 'platform', 'title', 'description', 'imageUrl', 'price',
@@ -81,13 +69,23 @@ export default async function adminProductRoutes(fastify, options) {
     const safeLimit = Math.min(parseInt(limit, 10) || 50, 200)
     const safePage = Math.max(1, parseInt(page, 10) || 1)
     const skip = (safePage - 1) * safeLimit
-    const sortColumn = SORTABLE[sortBy] || 'created_at'
+    const sortColumn = ADMIN_SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
     const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
     if (categoryId && !UUID_RE.test(categoryId)) {
       reply.code(400)
       return { error: 'Invalid categoryId' }
+    }
+
+    if (platform && !VALID_PLATFORMS.includes(platform)) {
+      reply.code(400)
+      return { error: 'Invalid platform' }
+    }
+
+    if (status && !VALID_STATUSES.includes(status)) {
+      reply.code(400)
+      return { error: 'Invalid status' }
     }
 
     const conditions = []
