@@ -33,13 +33,14 @@ export default async function productRoutes(fastify, options) {
     const skip = (safePage - 1) * safeLimit
     const sortColumn = SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
+    const safeStatus = status || 'ACTIVE'
 
     if (categoryId && !UUID_RE.test(categoryId)) {
       reply.code(400)
       return { error: 'Invalid categoryId' }
     }
 
-    const conditions = [sql`status = ${status}`]
+    const conditions = [sql`status = ${safeStatus}`]
     if (platform) conditions.push(sql`platform = ${platform}`)
     if (categoryId) conditions.push(sql`category_id = ${categoryId}`)
     if (minPrice) conditions.push(sql`price >= ${parseFloat(minPrice)}`)

@@ -462,6 +462,10 @@ export default async function webauthnRoutes(fastify, options) {
       const newCounter = verification.authenticationInfo.newCounter != null
         ? BigInt(verification.authenticationInfo.newCounter)
         : dbCredential.counter
+      // TODO: enforce counter replay protection per FIDO2 §6.4 — verify
+      // newCounter > dbCredential.counter to detect cloned authenticators.
+      // Skipped here because software authenticators (Touch ID, Windows Hello)
+      // legitimately report counter=0; a strict check requires per-device policy.
       await sql.begin(async sql => {
         await sql`
           update webauthn_credentials
