@@ -15,6 +15,8 @@ const ORIGIN = process.env.NODE_ENV === 'production'
   ? process.env.ADMIN_URL || 'https://admin.swordfighters.com'
   : 'http://localhost:3002'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // Email validation regex - RFC 5322 simplified
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -530,9 +532,19 @@ export default async function webauthnRoutes(fastify, options) {
     }
 
     const trimmedId = id.trim()
+
+    if (!UUID_RE.test(trimmedId)) {
+      reply.code(404)
+      return { error: 'Credential not found' }
+    }
+
     let notFound = false
     let isLastKey = false
 
+    // Early returns inside sql.begin() commit the transaction with no writes — they do NOT
+    // exit the outer function. The outer flags (notFound, isLastKey) are read after await
+    // to branch the HTTP response. Any write added after an early `return` here would be
+    // committed, so keep this callback write-free on the early-exit paths.
     await sql.begin(async sql => {
       const [credential] = await sql`
         select id from webauthn_credentials

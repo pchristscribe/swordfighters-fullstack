@@ -79,7 +79,8 @@ export default async function adminProductRoutes(fastify, options) {
     } = request.query
 
     const safeLimit = Math.min(parseInt(limit, 10) || 50, 200)
-    const skip = (parseInt(page, 10) - 1) * safeLimit
+    const safePage = Math.max(1, parseInt(page, 10) || 1)
+    const skip = (safePage - 1) * safeLimit
     const sortColumn = SORTABLE[sortBy] || 'created_at'
     const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
     const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
@@ -120,7 +121,7 @@ export default async function adminProductRoutes(fastify, options) {
     return {
       products: await attachRelations(sql, products),
       pagination: {
-        page: parseInt(page, 10),
+        page: safePage,
         limit: safeLimit,
         total,
         pages: Math.ceil(total / safeLimit)
