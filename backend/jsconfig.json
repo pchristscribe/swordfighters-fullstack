@@ -3,15 +3,13 @@
     // Environment setup & latest features
     "lib": ["ESNext"],
     "target": "ESNext",
-    "module": "Preserve",
+    "module": "NodeNext",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
     "allowJs": true,
-    "types": ["bun"],
+    "types": ["node"],
 
-    // Bundler mode
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
+    // Node.js ESM module resolution — matches how Node resolves imports at runtime
+    "moduleResolution": "nodenext",
     "verbatimModuleSyntax": true,
     "noEmit": true,
 
