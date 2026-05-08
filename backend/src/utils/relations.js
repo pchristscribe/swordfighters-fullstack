@@ -1,12 +1,5 @@
-/**
- * Attach related records (category, affiliateLinks, review _count) to a list of products.
- *
- * @param {Function} sql - postgres-js client
- * @param {Array} products - product rows to enrich
- * @param {Object} [options]
- * @param {boolean} [options.latestLinkOnly=false] - only return the most-recent affiliate link
- *   per product (used by the public catalog to avoid sending all historical links)
- */
+// Enrich a product list with category, affiliateLinks, and review _count in 3 parallel queries.
+// Pass latestLinkOnly:true (public catalog) to return only the newest link per product.
 export async function attachRelations(sql, products, { latestLinkOnly = false } = {}) {
   if (products.length === 0) return products
 

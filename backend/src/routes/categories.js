@@ -1,7 +1,4 @@
-function withCountShape(row) {
-  const { productCount, ...rest } = row
-  return { ...rest, _count: { products: Number(productCount ?? 0) } }
-}
+import { withCountShape } from '../utils/countShape.js'
 
 export default async function categoryRoutes(fastify, options) {
   const { sql, redis } = fastify

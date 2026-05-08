@@ -6,6 +6,8 @@ import {
   listCategoriesSchema,
   bulkDeleteCategoriesSchema
 } from '../../schemas/category.js'
+import { UUID_RE } from '../../utils/constants.js'
+import { withCountShape } from '../../utils/countShape.js'
 
 // Allowlist for sortBy → DB column mapping. Anything not in this map
 // falls back to `name` so the ORDER BY can never be user-controlled SQL.
@@ -15,8 +17,6 @@ const SORTABLE = {
   updatedAt: 'updated_at'
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
 // updated_at is maintained by the categories_updated_at BEFORE UPDATE trigger
 // defined in supabase/migrations/001_initial_schema.sql — no need to include it here
 const CATEGORY_WRITEABLE_FIELDS = ['name', 'slug', 'description', 'imageUrl']
@@ -25,13 +25,6 @@ const TO_COLUMN = {
 }
 
 const toColumn = (key) => TO_COLUMN[key] || key
-
-// Reshape `productCount` (from a subquery) into `_count: { products: N }`
-// for API compatibility with the previous Prisma response shape.
-function withCountShape(row) {
-  const { productCount, ...rest } = row
-  return { ...rest, _count: { products: Number(productCount ?? 0) } }
-}
 
 export default async function adminCategoryRoutes(fastify, options) {
   const { sql, redis } = fastify

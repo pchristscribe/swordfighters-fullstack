@@ -292,9 +292,7 @@ export default async function adminProductRoutes(fastify, options) {
     `
 
     await delPattern(redis, 'products:list:*')
-    for (const id of productIds) {
-      await redis.del(`product:${id}`)
-    }
+    await Promise.all(productIds.map(id => redis.del(`product:${id}`)))
 
     return {
       success: true,
@@ -321,9 +319,7 @@ export default async function adminProductRoutes(fastify, options) {
     `
 
     await delPattern(redis, 'products:list:*')
-    for (const id of productIds) {
-      await redis.del(`product:${id}`)
-    }
+    await Promise.all(productIds.map(id => redis.del(`product:${id}`)))
 
     return {
       success: true,

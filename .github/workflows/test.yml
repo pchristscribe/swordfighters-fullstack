@@ -114,7 +114,7 @@ jobs:
           # against plain Postgres in CI.
           psql -h localhost -U swordfighters -d swordfighters_test \
             -c "CREATE SCHEMA IF NOT EXISTS auth;" \
-            -c "CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS \$\$ SELECT 'authenticated'::text \$\$;"
+            -c "CREATE OR REPLACE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS \$\$ SELECT 'service_role'::text \$\$;"
           find ../supabase/migrations -name '*.sql' | sort | \
             xargs cat | \
             psql -h localhost -U swordfighters -d swordfighters_test -1

@@ -96,7 +96,8 @@ async function loadAdminByEmail(sql, email) {
   `
   if (!admin) return null
   const credentials = await sql`
-    select * from webauthn_credentials where admin_id = ${admin.id}
+    select id, credential_id, public_key, counter, transports
+    from webauthn_credentials where admin_id = ${admin.id}
   `
   return { ...admin, webauthnCredentials: credentials }
 }
@@ -461,10 +462,16 @@ export default async function webauthnRoutes(fastify, options) {
       const newCounter = verification.authenticationInfo.newCounter != null
         ? BigInt(verification.authenticationInfo.newCounter)
         : dbCredential.counter
-      // TODO: enforce counter replay protection per FIDO2 §6.4 — verify
-      // newCounter > dbCredential.counter to detect cloned authenticators.
-      // Skipped here because software authenticators (Touch ID, Windows Hello)
-      // legitimately report counter=0; a strict check requires per-device policy.
+
+      // FIDO2 §6.4 counter replay protection: a cloned authenticator would
+      // reuse a counter value the server has already seen. Skip the check
+      // when dbCredential.counter === 0n because software authenticators
+      // (Touch ID, Windows Hello) legitimately report 0 on every assertion.
+      if (dbCredential.counter > 0n && newCounter <= dbCredential.counter) {
+        reply.code(409)
+        return { error: 'Authentication failed: counter replay detected' }
+      }
+
       await sql.begin(async sql => {
         await sql`
           update webauthn_credentials

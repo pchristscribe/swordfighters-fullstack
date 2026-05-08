@@ -7,8 +7,7 @@ import {
   bulkDeleteReviewsSchema,
   bulkToggleFeaturedSchema
 } from '../../schemas/review.js'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+import { UUID_RE } from '../../utils/constants.js'
 
 const SORTABLE = {
   createdAt: 'created_at',
@@ -119,7 +118,7 @@ export default async function adminReviewRoutes(fastify, options) {
       return { error: 'Review not found' }
     }
 
-    const [product] = await sql`select * from products where id = ${review.productId}`
+    const [product] = await sql`select id, title, image_url from products where id = ${review.productId}`
     return { ...review, product: product || null }
   })
 
@@ -137,7 +136,7 @@ export default async function adminReviewRoutes(fastify, options) {
         insert into reviews ${sql(insertObj)}
         returning *
       `
-      const [product] = await sql`select * from products where id = ${review.productId}`
+      const [product] = await sql`select id, title, image_url from products where id = ${review.productId}`
 
       reply.code(201)
       return { ...review, product: product || null }
@@ -170,7 +169,7 @@ export default async function adminReviewRoutes(fastify, options) {
         reply.code(404)
         return { error: 'Review not found' }
       }
-      const [product] = await sql`select * from products where id = ${review.productId}`
+      const [product] = await sql`select id, title, image_url from products where id = ${review.productId}`
       return { ...review, product: product || null }
     }
 
@@ -186,7 +185,7 @@ export default async function adminReviewRoutes(fastify, options) {
       return { error: 'Review not found' }
     }
 
-    const [product] = await sql`select * from products where id = ${review.productId}`
+    const [product] = await sql`select id, title, image_url from products where id = ${review.productId}`
     return { ...review, product: product || null }
   })
 
