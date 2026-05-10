@@ -17,7 +17,7 @@ WebAuthn-secured admin panel for managing the Swordfighters affiliate marketing 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 24+
 - PostgreSQL and Redis running: `docker-compose up -d` from project root
 - Backend API running on `http://localhost:3001`
 

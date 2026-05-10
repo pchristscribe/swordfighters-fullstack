@@ -48,7 +48,7 @@ swordfighters-fullstack/
 - **Linting**: ESLint with typescript-eslint, eslint-plugin-vue
 
 ### Backend API (External Service)
-- Runtime: Node.js 20+, Framework: Fastify
+- Runtime: Node.js 24+, Framework: Fastify
 - Database: PostgreSQL with Prisma ORM
 - Task Queue: Bull (Redis-backed)
 - Caching: Redis

@@ -20,7 +20,7 @@
 ## Project Structure
 
 ```
-backend/               # Fastify API (Node.js 20+)
+backend/               # Fastify API (Node.js 24+)
 ├── src/
 │   ├── app.js        # Express middleware setup (CORS, sessions, routes)
 │   ├── index.js      # Entry point
