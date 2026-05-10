@@ -48,6 +48,15 @@ async function loadProductFull(sql, id) {
   }
 }
 
+/**
+ * Delete all Redis keys matching a glob pattern.
+ * redis.del() does not accept wildcards — this uses SCAN to find keys first.
+ */
+async function delByPattern(redis, pattern) {
+  const keys = await redis.keys(pattern);
+  if (keys.length > 0) await redis.del(...keys);
+}
+
 export default async function adminProductRoutes(fastify, options) {
   const { sql, redis } = fastify
 

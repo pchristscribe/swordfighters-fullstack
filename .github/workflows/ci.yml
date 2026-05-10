@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
       - name: Install dependencies
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
       - name: Install dependencies
@@ -53,10 +53,66 @@ jobs:
         working-directory: ${{ matrix.workspace }}
         run: npm test
 
+  backend-test:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: swordfighters
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: swordfighters_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://swordfighters:test@localhost:5432/swordfighters_test
+      - name: Run migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://swordfighters:test@localhost:5432/swordfighters_test
+      - name: Run tests
+        working-directory: backend
+        run: npm test
+        env:
+          DATABASE_URL: postgresql://swordfighters:test@localhost:5432/swordfighters_test
+          REDIS_URL: redis://localhost:6379
+          SESSION_SECRET: test-session-secret-at-least-32-chars-long
+          NODE_ENV: test
+
   e2e:
     name: E2E tests
     runs-on: ubuntu-latest
     needs: [build]
+    # Only run when Supabase credentials are available (set as repo/env secrets)
     if: ${{ secrets.NUXT_PUBLIC_SUPABASE_URL != '' }}
     strategy:
       fail-fast: false
@@ -66,7 +122,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
       - name: Install dependencies
@@ -101,7 +157,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
       - name: Install dependencies
