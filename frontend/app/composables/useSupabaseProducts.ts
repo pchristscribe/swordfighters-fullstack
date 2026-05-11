@@ -194,7 +194,13 @@ export const useSupabaseProducts = () => {
     const from = (page - 1) * limit
     const to = from + limit - 1
 
-    const sanitized = query.replace(/[%_\\]/g, '\\$&')
+    // Escape LIKE wildcards, then strip PostgREST filter delimiters (comma
+    // separates OR clauses; parens allow nested groups). Dot-operator paths
+    // remain theoretically injectable — full mitigation requires a Postgres
+    // RPC or .textSearch() (tracked in TECH_DEBT.md Phase 3).
+    const sanitized = query
+      .replace(/[%_\\]/g, '\\$&')
+      .replace(/[,()]/g, ' ')
     const { data, error, count } = await supabase
       .from('products')
       .select('*, categories(*)', { count: 'exact' })

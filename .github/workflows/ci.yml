@@ -112,8 +112,8 @@ jobs:
     name: E2E tests
     runs-on: ubuntu-latest
     needs: [build]
-    # Only run when Supabase credentials are available (set as repo/env secrets)
-    if: ${{ secrets.NUXT_PUBLIC_SUPABASE_URL != '' }}
+    # Only run when explicitly enabled (set vars.E2E_ENABLED = 'true' in repo/env settings)
+    if: ${{ vars.E2E_ENABLED == 'true' }}
     strategy:
       fail-fast: false
       matrix:
