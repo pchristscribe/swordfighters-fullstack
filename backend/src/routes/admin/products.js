@@ -1,12 +1,59 @@
-import { adminAuth } from '../../middleware/adminAuth.js';
+import { adminAuth } from '../../middleware/adminAuth.js'
+import { attachRelations } from '../../utils/relations.js'
+import { UUID_RE, ADMIN_SORTABLE, VALID_PLATFORMS, VALID_STATUSES } from '../../utils/constants.js'
+
+// ioredis del does not accept globs — use cursor scan to avoid blocking O(N) KEYS
+async function delPattern(redis, pattern) {
+  let cursor = '0'
+  do {
+    const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+    // ioredis.del accepts an array directly; spreading an unbounded list risks V8 arg limit
+    if (keys.length) await redis.del(keys)
+    cursor = next
+  } while (cursor !== '0')
+}
+
+const PRODUCT_FIELDS = [
+  'externalId', 'platform', 'title', 'description', 'imageUrl', 'price',
+  'currency', 'status', 'categoryId', 'rating', 'reviewCount', 'tags', 'metadata'
+]
+
+const TO_COLUMN = {
+  externalId: 'external_id',
+  imageUrl: 'image_url',
+  categoryId: 'category_id',
+  reviewCount: 'review_count'
+}
+
+const toColumn = (key) => TO_COLUMN[key] || key
+
+
+async function loadProductFull(sql, id) {
+  const [product] = await sql`select * from products where id = ${id}`
+  if (!product) return null
+
+  const [[category], links, reviews] = await Promise.all([
+    product.categoryId
+      ? sql`select * from categories where id = ${product.categoryId}`
+      : Promise.resolve([null]),
+    sql`select * from affiliate_links where product_id = ${id}`,
+    sql`select * from reviews where product_id = ${id} order by created_at desc`
+  ])
+
+  return {
+    ...product,
+    category: category || null,
+    affiliateLinks: links,
+    reviews
+  }
+}
 
 export default async function adminProductRoutes(fastify, options) {
-  const { prisma, redis } = fastify;
+  const { sql, redis } = fastify
 
-  // Apply auth middleware to all routes
-  fastify.addHook('onRequest', adminAuth);
+  fastify.addHook('onRequest', adminAuth)
 
-  // Get all products (admin view with more details)
+  // List products
   fastify.get('/', async (request, reply) => {
     const {
       platform,
@@ -17,236 +64,286 @@ export default async function adminProductRoutes(fastify, options) {
       search,
       sortBy = 'createdAt',
       order = 'desc'
-    } = request.query;
+    } = request.query
 
-    const skip = (page - 1) * limit;
-    const where = {};
+    const safeLimit = Math.min(parseInt(limit, 10) || 50, 200)
+    const safePage = Math.max(1, parseInt(page, 10) || 1)
+    const skip = (safePage - 1) * safeLimit
+    const sortColumn = ADMIN_SORTABLE[sortBy] || 'created_at'
+    const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
+    const searchPattern = search ? `%${search.replace(/[%_\\]/g, '\\$&')}%` : null
 
-    if (platform) where.platform = platform;
-    if (categoryId) where.categoryId = categoryId;
-    if (status) where.status = status;
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-        { externalId: { contains: search } }
-      ];
+    if (categoryId && !UUID_RE.test(categoryId)) {
+      reply.code(400)
+      return { error: 'Invalid categoryId' }
     }
 
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        orderBy: { [sortBy]: order },
-        include: {
-          category: true,
-          affiliateLinks: true,
-          _count: {
-            select: { reviews: true }
-          }
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
+    if (platform && !VALID_PLATFORMS.includes(platform)) {
+      reply.code(400)
+      return { error: 'Invalid platform' }
+    }
+
+    if (status && !VALID_STATUSES.includes(status)) {
+      reply.code(400)
+      return { error: 'Invalid status' }
+    }
+
+    const conditions = []
+    if (platform) conditions.push(sql`platform = ${platform}`)
+    if (categoryId) conditions.push(sql`category_id = ${categoryId}`)
+    if (status) conditions.push(sql`status = ${status}`)
+    if (searchPattern) {
+      conditions.push(sql`(
+        title ilike ${searchPattern}
+        or description ilike ${searchPattern}
+        or external_id ilike ${searchPattern}
+      )`)
+    }
+
+    // conditions.length === 0 guard keeps reduce safe; sql`true` is the identity element
+    const whereClause = conditions.length === 0
+      ? sql`true`
+      : conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`)
+
+    const [products, [{ count: total }]] = await Promise.all([
+      sql`
+        select * from products
+        where ${whereClause}
+        order by ${sql(sortColumn)} ${sortOrder}
+        limit ${safeLimit}
+        offset ${skip}
+      `,
+      sql`select count(*)::int as count from products where ${whereClause}`
+    ])
 
     return {
-      products,
+      products: await attachRelations(sql, products),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: safePage,
+        limit: safeLimit,
         total,
-        pages: Math.ceil(total / limit),
-      },
-    };
-  });
-
-  // Get single product by ID
-  fastify.get('/:id', async (request, reply) => {
-    const { id } = request.params;
-
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        affiliateLinks: true,
-        reviews: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
-
-    if (!product) {
-      reply.code(404);
-      return { error: 'Product not found' };
+        pages: Math.ceil(total / safeLimit)
+      }
     }
+  })
 
-    return product;
-  });
+  // Get single product
+  fastify.get('/:id', async (request, reply) => {
+    const { id } = request.params
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
+    const product = await loadProductFull(sql, id)
+    if (!product) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
+    return product
+  })
 
-  // Create new product
+  // Create product
   fastify.post('/', async (request, reply) => {
+    const data = request.body
+    const insertObj = Object.fromEntries(
+      PRODUCT_FIELDS
+        .filter(k => data[k] !== undefined)
+        .map(k => [toColumn(k), data[k]])
+    )
+
     try {
-      const product = await prisma.product.create({
-        data: request.body,
-        include: {
-          category: true,
-        },
-      });
+      const [created] = await sql`
+        insert into products ${sql(insertObj)}
+        returning *
+      `
 
-      // Invalidate cache
-      await redis.del('products:list:*');
+      const [category] = created.categoryId
+        ? await sql`select * from categories where id = ${created.categoryId}`
+        : [null]
 
-      reply.code(201);
-      return product;
+      await delPattern(redis, 'products:list:*')
+
+      reply.code(201)
+      return { ...created, category: category || null }
     } catch (error) {
-      if (error.code === 'P2002') {
-        reply.code(409);
+      if (error.code === '23505') {
+        reply.code(409)
         return {
           error: 'Conflict',
           message: 'Product with this platform and external ID already exists'
-        };
+        }
       }
-      throw error;
+      if (error.code === '23503') {
+        reply.code(422)
+        return { error: 'Referenced category does not exist' }
+      }
+      throw error
     }
-  });
+  })
 
   // Update product
   fastify.patch('/:id', async (request, reply) => {
-    const { id } = request.params;
-
-    try {
-      const product = await prisma.product.update({
-        where: { id },
-        data: request.body,
-        include: {
-          category: true,
-          affiliateLinks: true,
-        },
-      });
-
-      // Invalidate cache
-      await redis.del(`product:${id}`);
-      await redis.del('products:list:*');
-
-      return product;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        reply.code(404);
-        return { error: 'Product not found' };
-      }
-      throw error;
+    const { id } = request.params
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
     }
-  });
+    const data = request.body
+    const updateObj = Object.fromEntries(
+      PRODUCT_FIELDS
+        .filter(k => data[k] !== undefined)
+        .map(k => [toColumn(k), data[k]])
+    )
+
+    if (Object.keys(updateObj).length === 0) {
+      const product = await loadProductFull(sql, id)
+      if (!product) {
+        reply.code(404)
+        return { error: 'Product not found' }
+      }
+      return product
+    }
+
+    let updated
+    try {
+      const rows = await sql`
+        update products
+        set ${sql(updateObj)}
+        where id = ${id}
+        returning *
+      `
+      updated = rows[0]
+    } catch (error) {
+      if (error.code === '23503') {
+        reply.code(422)
+        return { error: 'Referenced category does not exist' }
+      }
+      throw error
+    }
+
+    if (!updated) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
+
+    const [[category], links] = await Promise.all([
+      updated.categoryId
+        ? sql`select * from categories where id = ${updated.categoryId}`
+        : Promise.resolve([null]),
+      sql`select * from affiliate_links where product_id = ${id}`
+    ])
+
+    await redis.del(`product:${id}`)
+    await delPattern(redis, 'products:list:*')
+
+    return {
+      ...updated,
+      category: category || null,
+      affiliateLinks: links
+    }
+  })
 
   // Delete product
   fastify.delete('/:id', async (request, reply) => {
-    const { id } = request.params;
+    const { id } = request.params
 
-    try {
-      await prisma.product.delete({
-        where: { id },
-      });
-
-      // Invalidate cache
-      await redis.del(`product:${id}`);
-      await redis.del('products:list:*');
-
-      reply.code(204);
-      return;
-    } catch (error) {
-      if (error.code === 'P2025') {
-        reply.code(404);
-        return { error: 'Product not found' };
-      }
-      throw error;
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
     }
-  });
+
+    const result = await sql`delete from products where id = ${id}`
+
+    if (Number(result.count) === 0) {
+      reply.code(404)
+      return { error: 'Product not found' }
+    }
+
+    await redis.del(`product:${id}`)
+    await delPattern(redis, 'products:list:*')
+
+    reply.code(204)
+    return
+  })
 
   // Bulk update status
   fastify.post('/bulk/status', async (request, reply) => {
-    const { productIds, status } = request.body;
+    const { productIds, status } = request.body
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-      reply.code(400);
-      return { error: 'productIds array is required' };
+      reply.code(400)
+      return { error: 'productIds array is required' }
+    }
+
+    if (productIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid product ID format' }
     }
 
     if (!['ACTIVE', 'INACTIVE', 'OUT_OF_STOCK'].includes(status)) {
-      reply.code(400);
-      return { error: 'Invalid status value' };
+      reply.code(400)
+      return { error: 'Invalid status value' }
     }
 
-    const result = await prisma.product.updateMany({
-      where: {
-        id: { in: productIds }
-      },
-      data: { status }
-    });
+    const result = await sql`
+      update products
+      set status = ${status}
+      where id in ${sql(productIds)}
+    `
 
-    // Invalidate cache
-    await redis.del('products:list:*');
-    for (const id of productIds) {
-      await redis.del(`product:${id}`);
-    }
+    await delPattern(redis, 'products:list:*')
+    await Promise.all(productIds.map(id => redis.del(`product:${id}`)))
 
     return {
       success: true,
       updated: result.count
-    };
-  });
+    }
+  })
 
   // Bulk delete
   fastify.post('/bulk/delete', async (request, reply) => {
-    const { productIds } = request.body;
+    const { productIds } = request.body
 
     if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
-      reply.code(400);
-      return { error: 'productIds array is required' };
+      reply.code(400)
+      return { error: 'productIds array is required' }
     }
 
-    const result = await prisma.product.deleteMany({
-      where: {
-        id: { in: productIds }
-      }
-    });
-
-    // Invalidate cache
-    await redis.del('products:list:*');
-    for (const id of productIds) {
-      await redis.del(`product:${id}`);
+    if (productIds.some(id => !UUID_RE.test(id))) {
+      reply.code(400)
+      return { error: 'Invalid product ID format' }
     }
+
+    const result = await sql`
+      delete from products where id in ${sql(productIds)}
+    `
+
+    await delPattern(redis, 'products:list:*')
+    await Promise.all(productIds.map(id => redis.del(`product:${id}`)))
 
     return {
       success: true,
       deleted: result.count
-    };
-  });
+    }
+  })
 
-  // Get dashboard stats
+  // Dashboard stats
   fastify.get('/stats/dashboard', async (request, reply) => {
     const [
-      totalProducts,
-      activeProducts,
-      outOfStock,
-      totalCategories,
-      totalReviews,
+      [{ count: totalProducts }],
+      [{ count: activeProducts }],
+      [{ count: outOfStock }],
+      [{ count: totalCategories }],
+      [{ count: totalReviews }],
       recentProducts
     ] = await Promise.all([
-      prisma.product.count(),
-      prisma.product.count({ where: { status: 'ACTIVE' } }),
-      prisma.product.count({ where: { status: 'OUT_OF_STOCK' } }),
-      prisma.category.count(),
-      prisma.review.count(),
-      prisma.product.findMany({
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          category: true,
-          _count: { select: { reviews: true } }
-        }
-      })
-    ]);
+      sql`select count(*)::int as count from products`,
+      sql`select count(*)::int as count from products where status = 'ACTIVE'`,
+      sql`select count(*)::int as count from products where status = 'OUT_OF_STOCK'`,
+      sql`select count(*)::int as count from categories`,
+      sql`select count(*)::int as count from reviews`,
+      sql`select * from products order by created_at desc limit 5`
+    ])
 
     return {
       stats: {
@@ -257,7 +354,7 @@ export default async function adminProductRoutes(fastify, options) {
         totalCategories,
         totalReviews
       },
-      recentProducts
-    };
-  });
+      recentProducts: await attachRelations(sql, recentProducts)
+    }
+  })
 }
