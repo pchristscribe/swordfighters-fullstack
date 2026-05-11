@@ -51,7 +51,7 @@ jobs:
         run: npm ci
       - name: Run tests
         working-directory: ${{ matrix.workspace }}
-        run: npm test
+        run: npm test -- --coverage
 
   backend-test:
     name: Backend unit tests
@@ -101,7 +101,7 @@ jobs:
           DATABASE_URL: postgresql://swordfighters:test@localhost:5432/swordfighters_test
       - name: Run tests
         working-directory: backend
-        run: npm test
+        run: npm test -- --coverage
         env:
           DATABASE_URL: postgresql://swordfighters:test@localhost:5432/swordfighters_test
           REDIS_URL: redis://localhost:6379

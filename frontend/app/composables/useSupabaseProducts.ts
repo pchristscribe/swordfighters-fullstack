@@ -194,11 +194,12 @@ export const useSupabaseProducts = () => {
     const from = (page - 1) * limit
     const to = from + limit - 1
 
+    const sanitized = query.replace(/[%_\\]/g, '\\$&')
     const { data, error, count } = await supabase
       .from('products')
       .select('*, categories(*)', { count: 'exact' })
       .eq('status', 'ACTIVE')
-      .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+      .or(`title.ilike.%${sanitized}%,description.ilike.%${sanitized}%`)
       .order('created_at', { ascending: false })
       .range(from, to)
 

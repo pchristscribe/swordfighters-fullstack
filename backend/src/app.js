@@ -12,7 +12,6 @@ import adminWebAuthnRoutes from './routes/admin/webauthn.js';
 import adminProductRoutes from './routes/admin/products.js';
 import adminCategoryRoutes from './routes/admin/categories.js';
 import adminReviewRoutes from './routes/admin/reviews.js';
-import { cleanupMiddleware } from './utils/cleanupExpiredChallenges.js';
 import { initSentry, captureException } from './lib/sentry.js';
 import * as Sentry from '@sentry/node';
 
@@ -75,10 +74,6 @@ export async function buildApp(opts = {}) {
       Sentry.setUser({ id: request.session.adminId });
     }
   });
-
-  // Add cleanup middleware for expired WebAuthn challenges
-  // Runs asynchronously on each request without blocking
-  fastify.addHook('onRequest', cleanupMiddleware);
 
   // Global error handler - capture all unhandled errors in Sentry
   fastify.setErrorHandler(async (error, request, reply) => {
