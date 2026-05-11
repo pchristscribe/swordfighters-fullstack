@@ -48,6 +48,17 @@ async function loadProductFull(sql, id) {
   }
 }
 
+async function delByPattern(redis, pattern) {
+  let cursor = '0'
+  const keys = []
+  do {
+    const [nextCursor, found] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100)
+    cursor = nextCursor
+    keys.push(...found)
+  } while (cursor !== '0')
+  if (keys.length > 0) await redis.del(...keys)
+}
+
 export default async function adminProductRoutes(fastify, options) {
   const { sql, redis } = fastify
 
