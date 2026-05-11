@@ -1,60 +1,66 @@
-export default async function categoryRoutes(fastify, options) {
-  const { prisma, redis } = fastify;
+import { withCountShape } from '../utils/countShape.js'
 
-  // Get all categories
+export default async function categoryRoutes(fastify, options) {
+  const { sql, redis } = fastify
+
+  // List categories
   fastify.get('/', async (request, reply) => {
-    // Try cache first
-    const cached = await redis.get('categories:all');
+    const cached = await redis.get('categories:all')
     if (cached) {
-      return JSON.parse(cached);
+      return JSON.parse(cached)
     }
 
-    const categories = await prisma.category.findMany({
-      include: {
-        _count: {
-          select: { products: true },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
+    const rows = await sql`
+      select c.*,
+        (select count(*)::int from products p where p.category_id = c.id) as product_count
+      from categories c
+      order by c.name asc
+    `
 
-    // Cache for 30 minutes
-    await redis.setex('categories:all', 1800, JSON.stringify(categories));
+    const categories = rows.map(withCountShape)
+    await redis.setex('categories:all', 1800, JSON.stringify(categories))
 
-    return categories;
-  });
+    return categories
+  })
 
   // Get category by ID or slug
   fastify.get('/:identifier', async (request, reply) => {
-    const { identifier } = request.params;
+    const { identifier } = request.params
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier)
 
-    const category = await prisma.category.findFirst({
-      where: {
-        OR: [
-          { id: identifier },
-          { slug: identifier },
-        ],
-      },
-      include: {
-        products: {
-          where: { status: 'ACTIVE' },
-          take: 12,
-          orderBy: { createdAt: 'desc' },
-        },
-        _count: {
-          select: { products: true },
-        },
-      },
-    });
+    const [row] = isUuid
+      ? await sql`
+          select c.*,
+            (select count(*)::int from products p where p.category_id = c.id) as product_count
+          from categories c
+          where c.id = ${identifier}::uuid
+          limit 1
+        `
+      : await sql`
+          select c.*,
+            (select count(*)::int from products p where p.category_id = c.id) as product_count
+          from categories c
+          where c.slug = ${identifier}
+          limit 1
+        `
 
-    if (!category) {
-      reply.code(404);
-      return { error: 'Category not found' };
+    if (!row) {
+      reply.code(404)
+      return { error: 'Category not found' }
     }
 
-    return category;
-  });
+    const products = await sql`
+      select * from products
+      where category_id = ${row.id} and status = 'ACTIVE'
+      order by created_at desc
+      limit 12
+    `
 
-  // Write operations (POST, PATCH, DELETE) are only available through admin routes
-  // See: backend/src/routes/admin/categories.js for authenticated admin endpoints
+    return {
+      ...withCountShape(row),
+      products
+    }
+  })
+
+  // Write operations live in backend/src/routes/admin/categories.js
 }

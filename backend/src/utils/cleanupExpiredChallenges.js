@@ -9,38 +9,30 @@
 
 /**
  * Clean up expired WebAuthn challenges from the database
- * @param {Object} prisma - Prisma client instance
+ * @param {Function} sql - postgres-js client
  * @param {Object} logger - Logger instance (optional)
  * @returns {Promise<number>} Number of challenges cleaned up
  */
-export async function cleanupExpiredChallenges(prisma, logger = console) {
+export async function cleanupExpiredChallenges(sql, logger = console) {
   try {
-    const now = new Date();
+    const result = await sql`
+      update admins
+      set current_challenge = null,
+          challenge_expires_at = null
+      where current_challenge is not null
+        and challenge_expires_at <= now()
+    `
 
-    // Find admins with expired challenges
-    const result = await prisma.admin.updateMany({
-      where: {
-        currentChallenge: {
-          not: null
-        },
-        challengeExpiresAt: {
-          lte: now
-        }
-      },
-      data: {
-        currentChallenge: null,
-        challengeExpiresAt: null
-      }
-    });
-
-    if (result.count > 0) {
-      logger.info({ count: result.count }, '🧹 Cleaned up expired challenges');
+    // postgres-js returns count as a string from the pg wire protocol command tag
+    const count = Number(result.count)
+    if (count > 0) {
+      logger.info({ count }, 'Cleaned up expired challenges')
     }
 
-    return result.count;
+    return count
   } catch (error) {
-    logger.error({ error: error.message }, '❌ Error cleaning up expired challenges');
-    throw error;
+    logger.error({ error: error.message }, 'Error cleaning up expired challenges')
+    throw error
   }
 }
 
@@ -51,11 +43,11 @@ export async function cleanupExpiredChallenges(prisma, logger = console) {
  */
 export function isValidChallenge(admin) {
   if (!admin.currentChallenge || !admin.challengeExpiresAt) {
-    return false;
+    return false
   }
 
-  const now = new Date();
-  return admin.challengeExpiresAt > now;
+  const now = new Date()
+  return admin.challengeExpiresAt > now
 }
 
 /**
@@ -63,12 +55,12 @@ export function isValidChallenge(admin) {
  * Usage: fastify.addHook('onRequest', cleanupMiddleware)
  */
 export function cleanupMiddleware(request, reply, done) {
-  const { prisma, log } = request.server;
+  const { sql, log } = request.server
 
   // Run cleanup asynchronously without blocking the request
-  cleanupExpiredChallenges(prisma, log).catch(error => {
-    log.error({ error: error.message }, 'Background cleanup failed');
-  });
+  cleanupExpiredChallenges(sql, log).catch(error => {
+    log.error({ error: error.message }, 'Background cleanup failed')
+  })
 
-  done();
+  done()
 }

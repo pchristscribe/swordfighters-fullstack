@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { RedisSessionStore } from './lib/sessionStore.js';
-import prisma from './lib/prisma.js';
+import sql from './lib/sql.js';
 import redis from './lib/redis.js';
 import productRoutes from './routes/products.js';
 import categoryRoutes from './routes/categories.js';
@@ -66,7 +66,7 @@ export async function buildApp(opts = {}) {
   });
 
   // Decorators for database clients
-  fastify.decorate('prisma', prisma);
+  fastify.decorate('sql', sql);
   fastify.decorate('redis', redis);
 
   // Sentry user context tracking
@@ -120,7 +120,7 @@ export async function buildApp(opts = {}) {
   // Health check route
   fastify.get('/health', async (request, reply) => {
     try {
-      await prisma.$queryRaw`SELECT 1`;
+      await sql`SELECT 1`;
       await redis.ping();
       return {
         status: 'ok',

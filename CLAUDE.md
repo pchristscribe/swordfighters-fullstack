@@ -15,7 +15,7 @@ Swordfighters App is an affiliate marketing platform targeting gay men, curating
 swordfighters-fullstack/
 ├── admin-frontend/            # Admin panel with WebAuthn authentication (Port 3002)
 ├── frontend/                  # User-facing product catalog (Port 3000)
-├── backend/                   # Fastify API (Prisma + Redis + WebAuthn) — deployable via Railway
+├── backend/                   # Fastify API (postgres-js → Supabase + Redis + WebAuthn) — deployable via Railway
 ├── backend-security-reference/ # Security reference implementation (middleware, routes, utils)
 ├── mcp-dhgate/                # DHgate MCP server for product scraping
 ├── supabase/
@@ -54,8 +54,8 @@ swordfighters-fullstack/
 - **Linting**: ESLint with typescript-eslint, eslint-plugin-vue
 
 ### Backend API (`backend/`)
-- Runtime: Node.js 20+, Framework: Fastify 5
-- Database: PostgreSQL via Prisma 7 (`prisma/schema.prisma`, `prisma/seed.js`)
+- Runtime: Node.js 24+, Framework: Fastify 5
+- Database: PostgreSQL via [`postgres-js`](https://github.com/porsager/postgres) — direct queries against Supabase Postgres. Schema source of truth lives in `supabase/migrations/`. The Fastify instance is decorated with a `sql` client (`fastify.sql`) configured with `transform: postgres.camel` so DB columns are returned as camelCase
 - Sessions: `@fastify/session` + `connect-redis` (Redis-backed)
 - Task Queue: Bull (Redis-backed)
 - WebAuthn: `@simplewebauthn/server` (admin auth)
@@ -185,16 +185,12 @@ frontend/
 
 ```
 backend/
-├── prisma/
-│   ├── schema.prisma          # Source of truth for the Postgres schema
-│   ├── migrations/
-│   └── seed.js
 ├── src/
 │   ├── index.js               # Server entry (Fastify, binds 0.0.0.0:$PORT)
 │   ├── app.js                 # Plugin/route registration
 │   ├── lib/
 │   │   ├── __tests__/         # Unit tests for lib modules (e.g. sentry.test.js)
-│   │   ├── prisma.js          # Prisma client singleton
+│   │   ├── sql.js             # postgres-js client singleton (camel transform)
 │   │   ├── redis.js           # ioredis client
 │   │   ├── sessionStore.js    # connect-redis store
 │   │   └── sentry.js
@@ -255,11 +251,10 @@ Both frontends can run concurrently — they use separate HMR ports (24678 and 2
 ```bash
 cd backend
 npm install
-npm run prisma:generate     # Generate Prisma client
-npm run prisma:migrate      # Run dev migrations
-npm run prisma:seed         # Seed dev data
 npm run dev                 # Start Fastify with --watch (default :3001)
 ```
+
+`DATABASE_URL` should point at Supabase Postgres (production: pooler URL with `?sslmode=require`; local dev: docker-compose Postgres). Schema migrations live in `supabase/migrations/` and are applied via `scripts/migrate.sh` — the backend has no migration runner of its own.
 
 ### Running Tests
 
@@ -405,7 +400,7 @@ Key variables (see `.env.example` for full list):
 | `NUXT_PUBLIC_SITE_URL` | Public site URL (canonical links, OG, sitemap) |
 | `NUXT_PUBLIC_API_BASE` | Backend API base — set this in both frontends; exposed via Nuxt runtime config (`useRuntimeConfig().public.apiBase`) |
 | `API_BASE_URL` | Backend API base for server-side / backend-internal use (default: `http://localhost:3001`); not visible to the browser |
-| `DATABASE_URL` | PostgreSQL connection string for Prisma |
+| `DATABASE_URL` | PostgreSQL connection string for the backend (`postgres-js`). Use the Supabase pooler URL (`?sslmode=require`) in production |
 | `REDIS_URL` / `REDIS_PASSWORD` | Redis connection (default password: `dev_redis_password`) |
 | `SESSION_SECRET` | Backend session secret (32+ chars; required in production) |
 | `FRONTEND_URL` / `ADMIN_URL` | Backend CORS allowlist |

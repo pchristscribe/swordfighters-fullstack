@@ -1,7 +1,10 @@
-export default async function productRoutes(fastify, options) {
-  const { prisma, redis } = fastify;
+import { attachRelations } from '../utils/relations.js'
+import { UUID_RE, SORTABLE, VALID_PLATFORMS, VALID_STATUSES } from '../utils/constants.js'
 
-  // Get all products with filtering and pagination
+export default async function productRoutes(fastify, options) {
+  const { sql, redis } = fastify
+
+  // List products with filtering and pagination
   fastify.get('/', async (request, reply) => {
     const {
       platform,
@@ -13,97 +16,111 @@ export default async function productRoutes(fastify, options) {
       maxPrice,
       sortBy = 'createdAt',
       order = 'desc'
-    } = request.query;
+    } = request.query
 
-    const skip = (page - 1) * limit;
-    const where = { status };
+    const safeLimit = Math.min(parseInt(limit, 10) || 20, 100)
+    const safePage = Math.max(1, parseInt(page, 10) || 1)
+    const skip = (safePage - 1) * safeLimit
+    const sortColumn = SORTABLE[sortBy] || 'created_at'
+    const sortOrder = order === 'asc' ? sql`asc` : sql`desc`
+    const safeStatus = status || 'ACTIVE'
 
-    if (platform) where.platform = platform;
-    if (categoryId) where.categoryId = categoryId;
-    if (minPrice || maxPrice) {
-      where.price = {};
-      if (minPrice) where.price.gte = parseFloat(minPrice);
-      if (maxPrice) where.price.lte = parseFloat(maxPrice);
+    if (categoryId && !UUID_RE.test(categoryId)) {
+      reply.code(400)
+      return { error: 'Invalid categoryId' }
     }
 
-    // Create a cache key from the query parameters
-    const cacheKey = `products:list:${JSON.stringify(request.query)}`;
+    if (!VALID_STATUSES.includes(safeStatus)) {
+      reply.code(400)
+      return { error: 'Invalid status' }
+    }
 
-    // Check if we have cached results
-    const cached = await redis.get(cacheKey);
+    if (platform && !VALID_PLATFORMS.includes(platform)) {
+      reply.code(400)
+      return { error: 'Invalid platform' }
+    }
+
+    const conditions = [sql`status = ${safeStatus}`]
+    if (platform) conditions.push(sql`platform = ${platform}`)
+    if (categoryId) conditions.push(sql`category_id = ${categoryId}`)
+    if (minPrice) conditions.push(sql`price >= ${parseFloat(minPrice)}`)
+    if (maxPrice) conditions.push(sql`price <= ${parseFloat(maxPrice)}`)
+
+    // conditions always has at least the status element, so reduce is safe without an empty-array guard
+    const whereClause = conditions.reduce((acc, c, i) => i === 0 ? c : sql`${acc} and ${c}`)
+
+    const cacheKey = `products:list:${JSON.stringify({ platform, categoryId, status, page, limit, minPrice, maxPrice, sortBy, order })}`
+    const cached = await redis.get(cacheKey)
     if (cached) {
-      return JSON.parse(cached); // Return cached data immediately
+      return JSON.parse(cached)
     }
 
-    // If no cache, fetch from database
-    const [products, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        skip,
-        take: parseInt(limit),
-        orderBy: { [sortBy]: order },
-        include: {
-          category: true,
-          affiliateLinks: {
-            take: 1,
-            orderBy: { createdAt: 'desc' }
-          },
-          _count: {
-            select: { reviews: true }
-          }
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
+    const [products, [{ count: total }]] = await Promise.all([
+      sql`
+        select * from products
+        where ${whereClause}
+        order by ${sql(sortColumn)} ${sortOrder}
+        limit ${safeLimit}
+        offset ${skip}
+      `,
+      sql`select count(*)::int as count from products where ${whereClause}`
+    ])
 
     const result = {
-      products,
+      products: await attachRelations(sql, products, { latestLinkOnly: true }),
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: safePage,
+        limit: safeLimit,
         total,
-        pages: Math.ceil(total / limit),
-      },
-    };
+        pages: Math.ceil(total / safeLimit)
+      }
+    }
 
-    // Cache the result for 5 minutes (300 seconds)
-    await redis.setex(cacheKey, 300, JSON.stringify(result));
+    await redis.setex(cacheKey, 300, JSON.stringify(result))
 
-    return result;
-  });
+    return result
+  })
 
   // Get single product by ID
   fastify.get('/:id', async (request, reply) => {
-    const { id } = request.params;
+    const { id } = request.params
 
-    // Try cache first
-    const cached = await redis.get(`product:${id}`);
-    if (cached) {
-      return JSON.parse(cached);
+    if (!UUID_RE.test(id)) {
+      reply.code(404)
+      return { error: 'Product not found' }
     }
 
-    const product = await prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        affiliateLinks: true,
-        reviews: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
+    const cached = await redis.get(`product:${id}`)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+
+    const [product] = await sql`select * from products where id = ${id}`
 
     if (!product) {
-      reply.code(404);
-      return { error: 'Product not found' };
+      reply.code(404)
+      return { error: 'Product not found' }
     }
 
-    // Cache for 1 hour
-    await redis.setex(`product:${id}`, 3600, JSON.stringify(product));
+    const [[category], links, reviews] = await Promise.all([
+      product.categoryId
+        ? sql`select * from categories where id = ${product.categoryId}`
+        : Promise.resolve([null]),
+      sql`select * from affiliate_links where product_id = ${id}`,
+      sql`select * from reviews where product_id = ${id} order by created_at desc`
+    ])
 
-    return product;
-  });
+    const result = {
+      ...product,
+      category: category || null,
+      affiliateLinks: links,
+      reviews
+    }
 
-  // Write operations (POST, PATCH, DELETE) are only available through admin routes
-  // See: backend/src/routes/admin/products.js for authenticated admin endpoints
+    await redis.setex(`product:${id}`, 3600, JSON.stringify(result))
+
+    return result
+  })
+
+  // Write operations live in backend/src/routes/admin/products.js
 }
