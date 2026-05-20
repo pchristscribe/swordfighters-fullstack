@@ -1,8 +1,8 @@
 # Tech Debt Audit — Swordfighters App
 
-**Audit date:** 2026-05-10  
-**Scope:** Full codebase (admin-frontend, frontend, backend, infra)  
-**Focus categories:** Dependencies & security · Test coverage · Code quality  
+**Audit date:** 2026-05-10
+**Scope:** Full codebase (admin-frontend, frontend, backend, infra)
+**Focus categories:** Dependencies & security · Test coverage · Code quality
 **Scoring:** Priority = (Impact + Risk) × (6 − Effort) — higher is worse/more urgent
 
 ---
@@ -10,7 +10,7 @@
 ## Critical findings (fix before next deploy)
 
 ### 1. Redis cache invalidation is silently broken — backend
-**Category:** Code quality  
+**Category:** Code quality
 **Impact:** 5 | **Risk:** 5 | **Effort:** 2 | **Priority score:** 40
 
 `redis.del('products:list:*')` appears in `admin/products.js` after every create, update, and delete. Redis `DEL` takes exact keys — it does not accept glob patterns. The wildcard is treated as a literal key name, so the list cache is never actually cleared. Admins can update a product and the public site will serve stale data indefinitely (1-hour TTL for product detail, 5-minute for lists).
@@ -25,14 +25,14 @@ if (keys.length) await redis.del(...keys)
 ---
 
 ### 2. Unvalidated body passed directly to Prisma create/update — backend
-**Category:** Code quality / security  
+**Category:** Code quality / security
 **Impact:** 5 | **Risk:** 5 | **Effort:** 2 | **Priority score:** 40
 
 In `admin/products.js`, `POST /` does `prisma.product.create({ data: request.body })` and `PATCH /:id` does `prisma.product.update({ data: request.body })`. Any field in the Prisma schema — including `id`, `createdAt`, `updatedAt`, `platform`, `affiliateLinks` relations — can be set or overwritten by an authenticated admin. It also means a future schema field is auto-writable without a deliberate decision to expose it.
 
 This is behind `adminAuth`, so the blast radius is limited to authenticated admins, but the pattern is fragile and will burn you if the auth layer ever has a bug.
 
-**Fix:** Destructure an explicit allowlist from `request.body` before passing to Prisma:
+**Fix:** Destructure an explicit allowlist from `request.body` before passing to Prisma:1
 
 ```js
 const { title, description, imageUrl, price, currency, categoryId, platform, externalId, status, rating, tags, metadata } = request.body
@@ -44,7 +44,7 @@ Adding Fastify JSON Schema validation to the POST/PATCH bodies would also catch 
 ---
 
 ### 3. `useRateLimit` called at module scope — admin-frontend
-**Category:** Code quality / SSR safety  
+**Category:** Code quality / SSR safety
 **Impact:** 4 | **Risk:** 5 | **Effort:** 1 | **Priority score:** 45
 
 In `admin-frontend/app/stores/auth.ts`, line 6:
@@ -71,7 +71,7 @@ actions: {
 ## High priority (address within 2 sprints)
 
 ### 4. Backend excluded from CI test matrix
-**Category:** Test coverage  
+**Category:** Test coverage
 **Impact:** 4 | **Risk:** 4 | **Effort:** 2 | **Priority score:** 32
 
 `ci.yml` runs unit tests for `frontend` and `admin-frontend` only. The `backend` workspace is absent from the matrix. Backend tests exist (`tests/products.test.js`, `tests/webauthn.test.js`, etc.) but never run in CI. A broken Fastify route, Prisma query, or auth middleware change can ship without any automated gate.
@@ -109,7 +109,7 @@ backend-test:
 ---
 
 ### 5. CI uses Node 22, engines requires Node ≥24
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 3 | **Risk:** 4 | **Effort:** 1 | **Priority score:** 21
 
 All three `package.json` files declare `"engines": { "node": ">=24" }`, but `ci.yml` installs Node 22 via `actions/setup-node`. This means CI is testing against an unsupported runtime. If any code relies on a Node 24+ API, CI will silently pass while production (presumably Node 24) could fail — or vice versa.
@@ -119,7 +119,7 @@ All three `package.json` files declare `"engines": { "node": ">=24" }`, but `ci.
 ---
 
 ### 6. `node` listed as a production dependency — backend
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 4 | **Risk:** 3 | **Effort:** 1 | **Priority score:** 21
 
 `backend/package.json` has `"node": "^25.8.2"` in `dependencies`. Node.js is the runtime — it is not an npm package you install. This does nothing at best (the npm registry has a stub `node` package that warns exactly about this), wastes an install step, and can cause confusion if anyone reads the lockfile or a tool tries to resolve it as a peer dep.
@@ -129,7 +129,7 @@ All three `package.json` files declare `"engines": { "node": ">=24" }`, but `ci.
 ---
 
 ### 7. `@prisma/studio-core` pinned to a GitHub source
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 3 | **Risk:** 4 | **Effort:** 1 | **Priority score:** 21
 
 `"@prisma/studio-core": "github:prisma/studio"` is a production dependency pinned to a GitHub repo with no tag or commit hash. It will resolve to whatever is on that repo's default branch at install time — meaning two installs a week apart can pull different code. It also doesn't go through npm's integrity checking.
@@ -141,7 +141,7 @@ This is almost certainly a development convenience (Prisma Studio is a dev tool)
 ---
 
 ### 8. `prettier-plugin-prisma` in production dependencies — backend
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 2 | **Risk:** 2 | **Effort:** 1 | **Priority score:** 12
 
 A formatter plugin belongs in `devDependencies`. Currently it inflates the production install.
@@ -151,7 +151,7 @@ A formatter plugin belongs in `devDependencies`. Currently it inflates the produ
 ---
 
 ### 9. Search is vulnerable to PostgREST filter injection — frontend
-**Category:** Code quality / security  
+**Category:** Code quality / security
 **Impact:** 4 | **Risk:** 3 | **Effort:** 2 | **Priority score:** 28
 
 In `useSupabaseProducts.ts`, `searchProducts` builds its filter with string interpolation:
@@ -171,7 +171,7 @@ Or better, move full-text search to a Postgres `to_tsvector`/`to_tsquery` approa
 ---
 
 ### 10. `cleanupExpiredChallenges` runs as `onRequest` middleware on every request
-**Category:** Code quality / architecture  
+**Category:** Code quality / architecture
 **Impact:** 3 | **Risk:** 3 | **Effort:** 2 | **Priority score:** 24
 
 `app.js` registers `cleanupMiddleware` as an `onRequest` hook. This fires a Postgres `updateMany` on every single HTTP request — including static asset requests, health checks, and high-frequency product list polls. It's fire-and-forget (`catch` swallowed), so failures are invisible. Under load this creates unnecessary DB write pressure.
@@ -181,7 +181,7 @@ Or better, move full-text search to a Postgres `to_tsvector`/`to_tsquery` approa
 ---
 
 ### 11. Console.log with emoji left in production auth code — admin-frontend
-**Category:** Code quality  
+**Category:** Code quality
 **Impact:** 2 | **Risk:** 3 | **Effort:** 1 | **Priority score:** 15
 
 `auth.ts` has 15+ `console.log` / `console.error` calls with emoji that print sensitive operational details (API base URL, credential objects, auth state) in production browser consoles. Anyone opening DevTools can read auth flow internals.
@@ -191,7 +191,7 @@ Or better, move full-text search to a Postgres `to_tsvector`/`to_tsquery` approa
 ---
 
 ### 12. Client-side rating filter conflicts with server-side pagination
-**Category:** Code quality / architecture  
+**Category:** Code quality / architecture
 **Impact:** 3 | **Risk:** 3 | **Effort:** 3 | **Priority score:** 18
 
 In `products.ts`, the `filteredProducts` getter applies a `minRating` filter in JavaScript on the already-paginated result set from the server. This means: if page 1 has 20 products and 15 fail the rating filter, the user sees 5 products on page 1 — not because there are only 5, but because the server sent 20 and 15 were hidden. The pagination controls will show wrong counts and "next page" behavior will be broken.
@@ -203,7 +203,7 @@ In `products.ts`, the `filteredProducts` getter applies a `minRating` filter in 
 ---
 
 ### 13. ESLint packages in production `dependencies` — frontend
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 2 | **Risk:** 2 | **Effort:** 1 | **Priority score:** 12
 
 `frontend/package.json` has `@eslint/css`, `@eslint/js`, `@eslint/json`, `@eslint/markdown`, `eslint`, `eslint-plugin-vue`, `typescript-eslint`, and `globals` in `dependencies` rather than `devDependencies`. These increase production bundle install time and are never used at runtime.
@@ -213,7 +213,7 @@ In `products.ts`, the `filteredProducts` getter applies a `minRating` filter in 
 ---
 
 ### 14. No automated dependency update mechanism
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 3 | **Risk:** 3 | **Effort:** 2 | **Priority score:** 24
 
 There is no Dependabot or Renovate configuration. Security patches to `fastify`, `@simplewebauthn/*`, `@sentry/*`, and Supabase client won't surface automatically. The `npm audit` step in CI is a safety net, but it won't propose upgrades — only flag known CVEs.
@@ -223,7 +223,7 @@ There is no Dependabot or Renovate configuration. Security patches to `fastify`,
 ---
 
 ### 15. `@prisma/client-runtime-utils` and `@prisma/prisma-schema-wasm` as direct user deps
-**Category:** Dependencies  
+**Category:** Dependencies
 **Impact:** 2 | **Risk:** 3 | **Effort:** 1 | **Priority score:** 15
 
 These are internal Prisma packages meant to be managed by the Prisma CLI, not listed as direct user dependencies. The `@prisma/prisma-schema-wasm` version even includes a hardcoded git commit hash (`7.8.0-6.3c6e...`). Direct pins like this break when Prisma releases updates and can create version mismatches between the user-declared version and what `prisma generate` expects.
@@ -233,7 +233,7 @@ These are internal Prisma packages meant to be managed by the Prisma CLI, not li
 ---
 
 ### 16. No coverage enforcement in CI
-**Category:** Test coverage  
+**Category:** Test coverage
 **Impact:** 3 | **Risk:** 3 | **Effort:** 2 | **Priority score:** 24
 
 The `test:coverage` script exists in all workspaces but CI runs `npm test` (not `npm run test:coverage`), so no thresholds are enforced. Coverage can drop to 0% without a CI failure. CLAUDE.md claims ">80% coverage required" for new features, but nothing enforces this.
@@ -250,7 +250,7 @@ coverage: {
 ---
 
 ### 17. E2E tests silently skipped in CI
-**Category:** Test coverage  
+**Category:** Test coverage
 **Impact:** 3 | **Risk:** 3 | **Effort:** 2 | **Priority score:** 24
 
 The E2E job in `ci.yml` has `if: ${{ secrets.NUXT_PUBLIC_SUPABASE_URL != '' }}`. The condition syntax is wrong — GitHub expressions don't evaluate secrets this way; the expression will always be falsy in a fork or a repo that hasn't configured the secret. The E2E tests never run in CI.

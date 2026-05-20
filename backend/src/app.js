@@ -80,9 +80,9 @@ export async function buildApp(opts = {}) {
   // handles this when deployed as a separate process; this interval is the fallback
   // for environments (e.g. Railway single-service) where the worker isn't running.
   fastify.addHook('onReady', async () => {
-    cleanupExpiredChallenges(prisma, fastify.log).catch(captureException)
+    cleanupExpiredChallenges(fastify.sql, fastify.log).catch(captureException)
     const interval = setInterval(
-      () => cleanupExpiredChallenges(prisma, fastify.log).catch(captureException),
+      () => cleanupExpiredChallenges(fastify.sql, fastify.log).catch(captureException),
       5 * 60 * 1000
     )
     fastify.addHook('onClose', async () => clearInterval(interval))
