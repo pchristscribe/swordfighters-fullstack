@@ -12,74 +12,52 @@ concurrency:
 
 jobs:
   security-audit:
-    name: Security audit
+    name: Security audit (${{ matrix.workspace }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - workspace: frontend
-            package_manager: npm
-            lock_file: package-lock.json
-            install_cmd: npm ci
-            audit_cmd: npm audit --omit=dev --audit-level=high
-          - workspace: admin-frontend
-            package_manager: pnpm
-            lock_file: pnpm-lock.yaml
-            install_cmd: pnpm install --frozen-lockfile
-            audit_cmd: pnpm audit --audit-level=high --prod
+        workspace: [frontend, admin-frontend]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        if: matrix.package_manager == 'pnpm'
         with:
           version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: ${{ matrix.package_manager }}
-          cache-dependency-path: ${{ matrix.workspace }}/${{ matrix.lock_file }}
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.workspace }}/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: ${{ matrix.workspace }}
-        run: ${{ matrix.install_cmd }}
+        run: pnpm install --frozen-lockfile
       - name: Run audit
         working-directory: ${{ matrix.workspace }}
-        run: ${{ matrix.audit_cmd }}
+        run: pnpm audit --audit-level=high --prod
 
   test:
-    name: Unit tests
+    name: Unit tests (${{ matrix.workspace }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - workspace: frontend
-            package_manager: npm
-            lock_file: package-lock.json
-            install_cmd: npm ci
-            test_cmd: npm test -- --coverage
-          - workspace: admin-frontend
-            package_manager: pnpm
-            lock_file: pnpm-lock.yaml
-            install_cmd: pnpm install --frozen-lockfile
-            test_cmd: pnpm test -- --coverage
+        workspace: [frontend, admin-frontend]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        if: matrix.package_manager == 'pnpm'
         with:
           version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: ${{ matrix.package_manager }}
-          cache-dependency-path: ${{ matrix.workspace }}/${{ matrix.lock_file }}
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.workspace }}/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: ${{ matrix.workspace }}
-        run: ${{ matrix.install_cmd }}
+        run: pnpm install --frozen-lockfile
       - name: Run tests
         working-directory: ${{ matrix.workspace }}
-        run: ${{ matrix.test_cmd }}
+        run: pnpm test -- --coverage
 
   backend-test:
     name: Backend unit tests
@@ -109,14 +87,17 @@ jobs:
           - 6379:6379
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: backend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Apply Supabase migrations
         run: |
           psql postgresql://swordfighters:test@localhost:5432/swordfighters_test \
@@ -129,7 +110,7 @@ jobs:
           PGPASSWORD: test
       - name: Run tests
         working-directory: backend
-        run: npm test -- --coverage
+        run: pnpm test -- --coverage
         env:
           TEST_DATABASE_URL: postgresql://swordfighters:test@localhost:5432/swordfighters_test
           TEST_REDIS_URL: redis://localhost:6379
@@ -137,7 +118,7 @@ jobs:
           NODE_ENV: test
 
   e2e:
-    name: E2E tests
+    name: E2E tests (${{ matrix.workspace }})
     runs-on: ubuntu-latest
     needs: [build]
     # Only run when explicitly enabled (set vars.E2E_ENABLED = 'true' in repo/env settings)
@@ -145,35 +126,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - workspace: frontend
-            package_manager: npm
-            lock_file: package-lock.json
-            install_cmd: npm ci
-          - workspace: admin-frontend
-            package_manager: pnpm
-            lock_file: pnpm-lock.yaml
-            install_cmd: pnpm install --frozen-lockfile
+        workspace: [frontend, admin-frontend]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        if: matrix.package_manager == 'pnpm'
         with:
           version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: ${{ matrix.package_manager }}
-          cache-dependency-path: ${{ matrix.workspace }}/${{ matrix.lock_file }}
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.workspace }}/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: ${{ matrix.workspace }}
-        run: ${{ matrix.install_cmd }}
+        run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
         working-directory: ${{ matrix.workspace }}
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
       - name: Run E2E tests
         working-directory: ${{ matrix.workspace }}
-        run: npx playwright test
+        run: pnpm exec playwright test
         env:
           NUXT_PUBLIC_SUPABASE_URL: ${{ secrets.NUXT_PUBLIC_SUPABASE_URL }}
           NUXT_PUBLIC_SUPABASE_KEY: ${{ secrets.NUXT_PUBLIC_SUPABASE_KEY }}
@@ -186,35 +158,26 @@ jobs:
           retention-days: 14
 
   build:
-    name: Build verification
+    name: Build verification (${{ matrix.workspace }})
     runs-on: ubuntu-latest
     needs: [test, backend-test]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - workspace: frontend
-            package_manager: npm
-            lock_file: package-lock.json
-            install_cmd: npm ci
-          - workspace: admin-frontend
-            package_manager: pnpm
-            lock_file: pnpm-lock.yaml
-            install_cmd: pnpm install --frozen-lockfile
+        workspace: [frontend, admin-frontend]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        if: matrix.package_manager == 'pnpm'
         with:
           version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: ${{ matrix.package_manager }}
-          cache-dependency-path: ${{ matrix.workspace }}/${{ matrix.lock_file }}
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.workspace }}/pnpm-lock.yaml
       - name: Install dependencies
         working-directory: ${{ matrix.workspace }}
-        run: ${{ matrix.install_cmd }}
+        run: pnpm install --frozen-lockfile
       - name: Build
         working-directory: ${{ matrix.workspace }}
-        run: npm run build
+        run: pnpm run build
