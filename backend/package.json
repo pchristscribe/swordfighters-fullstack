@@ -26,7 +26,7 @@
   "license": "ISC",
   "dependencies": {
     "@dotenvx/dotenvx": "^1.51.2",
-    "@dotenvx/dotenvx-ops": "^0.37.4",
+    "@dotenvx/dotenvx-ops": "^0.53.2",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.1.0",
     "@fastify/env": "^5.0.3",
