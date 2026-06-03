@@ -30,7 +30,6 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/env": "^6.0.0",
     "@fastify/session": "^11.1.1",
-    "@nuxt/kit": "^4.4.7",
     "@sentry/node": "^10.56.0",
     "@sentry/profiling-node": "^10.56.0",
     "@simplewebauthn/server": "^13.3.1",
@@ -39,8 +38,7 @@
     "dotenv": "^17.4.2",
     "fastify": "^5.8.5",
     "ioredis": "^5.11.0",
-    "postgres": "^3.4.9",
-    "uuid": "^14.0.0"
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@vitest/ui": "^4.1.8",

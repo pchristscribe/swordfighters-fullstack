@@ -21,7 +21,7 @@ if (process.env.SENTRY_DSN) {
       'ENOTFOUND',
       'ECONNREFUSED',
     ],
-    beforeSend(event, hint) { // eslint-disable-line no-unused-vars
+    beforeSend(event, _hint) {
       if (event.request) {
         if (event.request.headers) event.request.headers = sanitizeSensitiveData(event.request.headers)
         if (event.request.cookies) event.request.cookies = sanitizeSensitiveData(event.request.cookies)

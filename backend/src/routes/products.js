@@ -156,7 +156,9 @@ export default async function productRoutes(fastify, options) {
       || request.headers['x-forwarded-for']?.split(',')[0].trim()
       || request.socket.remoteAddress
       || 'unknown'
-    const rateLimitKey = `click:rl:${affiliateLinkId}:${clientIp}`
+    // Hash the IP so IPv6 colons don't collide with the key delimiter.
+    const ipKey = createHash('sha256').update(clientIp).digest('hex').slice(0, 16)
+    const rateLimitKey = `click:rl:${affiliateLinkId}:${ipKey}`
     const [[, count]] = await redis.multi()
       .incr(rateLimitKey)
       .expire(rateLimitKey, 60, 'NX')
