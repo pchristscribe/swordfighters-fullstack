@@ -98,7 +98,7 @@ backend-test:
         node-version: '24'
     - run: pnpm install --frozen-lockfile
       working-directory: backend
-    - run: pnpm prisma:migrate
+    - run: SUPABASE_ACCESS_TOKEN=${{ secrets.SUPABASE_ACCESS_TOKEN }} SUPABASE_PROJECT_REF=${{ secrets.SUPABASE_PROJECT_REF }} ./scripts/migrate.sh
       working-directory: backend
       env:
         DATABASE_URL: postgresql://postgres:test@localhost/swordfighters_test
