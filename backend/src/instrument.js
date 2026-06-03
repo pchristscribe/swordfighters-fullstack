@@ -2,21 +2,28 @@ import * as Sentry from '@sentry/node'
 import { nodeProfilingIntegration } from '@sentry/profiling-node'
 import { sanitizeSensitiveData } from './lib/sentry.js'
 
+function clampSampleRate(envVar, defaultValue) {
+  if (!envVar) return defaultValue
+  const rate = parseFloat(envVar)
+  if (isNaN(rate) || rate < 0 || rate > 1) {
+    console.warn(`Invalid sample rate "${envVar}". Must be between 0 and 1. Using default: ${defaultValue}`)
+    return defaultValue
+  }
+  return rate
+}
+
 if (process.env.SENTRY_DSN) {
-  const tracesSampleRate = parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE)
-  const profilesSampleRate = parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE)
+  const isProd = process.env.NODE_ENV === 'production'
+  const tracesSampleRate = clampSampleRate(process.env.SENTRY_TRACES_SAMPLE_RATE, isProd ? 0.1 : 1.0)
+  const profilesSampleRate = clampSampleRate(process.env.SENTRY_PROFILES_SAMPLE_RATE, isProd ? 0.1 : 1.0)
 
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV || 'development',
     release: process.env.SENTRY_RELEASE || undefined,
     integrations: [nodeProfilingIntegration()],
-    tracesSampleRate: isNaN(tracesSampleRate)
-      ? process.env.NODE_ENV === 'production' ? 0.1 : 1.0
-      : tracesSampleRate,
-    profilesSampleRate: isNaN(profilesSampleRate)
-      ? process.env.NODE_ENV === 'production' ? 0.1 : 1.0
-      : profilesSampleRate,
+    tracesSampleRate,
+    profilesSampleRate,
     ignoreErrors: [
       'Non-Error promise rejection captured',
       'ECONNRESET',

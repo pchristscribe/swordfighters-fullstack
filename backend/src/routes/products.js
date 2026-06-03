@@ -147,17 +147,7 @@ export default async function productRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     const { id } = request.params
-    const { affiliateLinkId } = request.body || {}
-
-    if (!UUID_RE.test(id)) {
-      reply.code(400)
-      return { error: 'Invalid product id' }
-    }
-
-    if (!affiliateLinkId || !UUID_RE.test(affiliateLinkId)) {
-      reply.code(400)
-      return { error: 'affiliateLinkId is required and must be a valid UUID' }
-    }
+    const { affiliateLinkId } = request.body
 
     // Verify the affiliate link belongs to this product so callers can't log
     // clicks against arbitrary link/product combinations.

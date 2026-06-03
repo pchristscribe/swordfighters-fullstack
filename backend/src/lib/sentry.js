@@ -83,7 +83,7 @@ export function initSentry(fastify) {
     fastify.log.warn('SENTRY_DSN not configured - Sentry monitoring disabled')
     return
   }
-  fastify.log.info('Sentry active')
+  fastify.log.info(`Sentry active (env: ${process.env.NODE_ENV || 'development'}, traces: ${process.env.SENTRY_TRACES_SAMPLE_RATE || 'default'}, profiles: ${process.env.SENTRY_PROFILES_SAMPLE_RATE || 'default'})`)
 }
 
 /**
