@@ -122,5 +122,52 @@ export default async function productRoutes(fastify, options) {
     return result
   })
 
+  // Track an affiliate link click
+  // POST /products/:id/click  body: { affiliateLinkId }
+  fastify.post('/:id/click', async (request, reply) => {
+    const { id } = request.params
+    const { affiliateLinkId } = request.body || {}
+
+    if (!UUID_RE.test(id)) {
+      reply.code(400)
+      return { error: 'Invalid product id' }
+    }
+
+    if (!affiliateLinkId || !UUID_RE.test(affiliateLinkId)) {
+      reply.code(400)
+      return { error: 'affiliateLinkId is required and must be a valid UUID' }
+    }
+
+    // Verify the affiliate link belongs to this product so callers can't log
+    // clicks against arbitrary link/product combinations.
+    const [link] = await sql`
+      select id from affiliate_links
+      where id = ${affiliateLinkId} and product_id = ${id}
+    `
+
+    if (!link) {
+      reply.code(404)
+      return { error: 'Affiliate link not found for this product' }
+    }
+
+    // Collect lightweight attribution metadata — no PII stored.
+    const userAgent = request.headers['user-agent'] || ''
+    const referrer = request.headers['referer'] || request.headers['referrer'] || null
+    const ipCountry = request.headers['cf-ipcountry'] || request.headers['x-country'] || null
+
+    // Hash the UA for rough unique-visitor metrics without storing raw strings.
+    const crypto = await import('node:crypto')
+    const userAgentHash = userAgent
+      ? crypto.createHash('sha256').update(userAgent).digest('hex')
+      : null
+
+    await sql`
+      insert into clicks (affiliate_link_id, product_id, user_agent_hash, referrer, ip_country)
+      values (${affiliateLinkId}, ${id}, ${userAgentHash}, ${referrer}, ${ipCountry})
+    `
+
+    reply.code(204)
+  })
+
   // Write operations live in backend/src/routes/admin/products.js
 }
