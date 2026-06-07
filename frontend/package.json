@@ -39,6 +39,7 @@
     "@playwright/test": "^1.52.0",
     "@types/domexception": "^4.0.3",
     "@vitejs/plugin-vue": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.8",
     "@vitest/ui": "^4.0.14",
     "@vue/test-utils": "^2.4.6",
     "baseline-browser-mapping": "^2.10.13",
