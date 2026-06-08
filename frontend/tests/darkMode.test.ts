@@ -119,4 +119,132 @@ describe('useDarkMode', () => {
       expect(localStorage.getItem('darkMode')).toBe('light')
     })
   })
+
+  describe('SSR / server-side rendering guards', () => {
+    let originalWindow: typeof globalThis.window
+
+    beforeEach(() => {
+      originalWindow = globalThis.window
+    })
+
+    afterEach(() => {
+      Object.defineProperty(globalThis, 'window', {
+        value: originalWindow,
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    const withoutWindow = (fn: () => void) => {
+      Object.defineProperty(globalThis, 'window', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
+      try {
+        fn()
+      } finally {
+        Object.defineProperty(globalThis, 'window', {
+          value: originalWindow,
+          writable: true,
+          configurable: true,
+        })
+      }
+    }
+
+    describe('applyDarkMode SSR guard', () => {
+      it('does not add dark class to document when window is undefined (dark=true)', () => {
+        document.documentElement.classList.remove('dark')
+        const { toggle } = useDarkMode()
+
+        withoutWindow(() => {
+          toggle()
+        })
+
+        expect(document.documentElement.classList.contains('dark')).toBe(false)
+      })
+
+      it('does not remove dark class from document when window is undefined (dark=false)', () => {
+        document.documentElement.classList.add('dark')
+        const { isDark, toggle } = useDarkMode()
+        // Manually set isDark so next toggle goes dark→light path
+        isDark.value = true
+
+        withoutWindow(() => {
+          toggle()
+        })
+
+        // classList should be unchanged (guard fired before classList.remove)
+        expect(document.documentElement.classList.contains('dark')).toBe(true)
+        document.documentElement.classList.remove('dark')
+      })
+
+      it('does not write to localStorage when window is undefined', () => {
+        const { toggle } = useDarkMode()
+
+        withoutWindow(() => {
+          toggle()
+        })
+
+        expect(localStorage.getItem('darkMode')).toBeNull()
+      })
+
+      it('does not throw when window is undefined', () => {
+        const { toggle } = useDarkMode()
+
+        expect(() => {
+          withoutWindow(() => {
+            toggle()
+          })
+        }).not.toThrow()
+      })
+    })
+
+    describe('init SSR guard', () => {
+      it('does not access localStorage when window is undefined', () => {
+        const getItemSpy = vi.spyOn(localStorage, 'getItem')
+        const { init } = useDarkMode()
+
+        withoutWindow(() => {
+          init()
+        })
+
+        expect(getItemSpy).not.toHaveBeenCalled()
+      })
+
+      it('does not modify isDark when window is undefined', () => {
+        ;(window.matchMedia as ReturnType<typeof vi.fn>).mockReturnValue({ matches: true })
+        localStorage.setItem('darkMode', 'dark')
+        const { isDark, init } = useDarkMode()
+
+        withoutWindow(() => {
+          init()
+        })
+
+        // isDark should remain at its initial false value
+        expect(isDark.value).toBe(false)
+      })
+
+      it('does not add dark class to document when window is undefined', () => {
+        document.documentElement.classList.remove('dark')
+        const { init } = useDarkMode()
+
+        withoutWindow(() => {
+          init()
+        })
+
+        expect(document.documentElement.classList.contains('dark')).toBe(false)
+      })
+
+      it('does not throw when window is undefined', () => {
+        const { init } = useDarkMode()
+
+        expect(() => {
+          withoutWindow(() => {
+            init()
+          })
+        }).not.toThrow()
+      })
+    })
+  })
 })
