@@ -9,15 +9,10 @@ jobs:
     name: Deploy backend to Railway
     runs-on: ubuntu-latest
     environment: production
-
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Deploy API service
         working-directory: backend
         env:
