@@ -39,9 +39,9 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Swordfighters Admin',
+      title: 'Yourplug Admin',
       meta: [
-        { name: 'description', content: 'Admin panel for Swordfighters affiliate platform' },
+        { name: 'description', content: 'Admin panel for Yourplug affiliate platform' },
         // Content Security Policy - Defense against XSS attacks
         {
           'http-equiv': 'Content-Security-Policy',

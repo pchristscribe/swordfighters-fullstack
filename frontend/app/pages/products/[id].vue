@@ -17,12 +17,12 @@ useSeoMeta({
   title: () => product.value ? product.value.title : 'Product',
   description: () =>
     product.value
-      ? (product.value.description?.slice(0, 200) || `${product.value.title} on Swordfighters.`)
-      : 'Swordfighters curated product.',
-  ogTitle: () => product.value?.title ?? 'Swordfighters',
+      ? (product.value.description?.slice(0, 200) || `${product.value.title} on Yourplug.`)
+      : 'Yourplug curated product.',
+  ogTitle: () => product.value?.title ?? 'Yourplug',
   ogDescription: () =>
     product.value?.description?.slice(0, 200)
-    ?? 'Curated product for gay men on Swordfighters.',
+    ?? 'Curated product for gay men on Yourplug.',
   ogImage: () => product.value?.imageUrl ?? undefined,
   ogType: 'website',
   ogUrl: () => `${siteUrl}/products/${productId}`,

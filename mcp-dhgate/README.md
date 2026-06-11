@@ -1,6 +1,6 @@
 # MCP DHgate Server
 
-A Model Context Protocol (MCP) server that enables LLMs to search DHgate products and generate affiliate links for the Swordfighters affiliate marketing platform.
+A Model Context Protocol (MCP) server that enables LLMs to search DHgate products and generate affiliate links for the Yourplug affiliate marketing platform.
 
 ## Features
 

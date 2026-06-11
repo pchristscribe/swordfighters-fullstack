@@ -1,6 +1,6 @@
-# Swordfighters Admin Panel
+# Yourplug Admin Panel
 
-WebAuthn-secured admin panel for managing the Swordfighters affiliate marketing platform.
+WebAuthn-secured admin panel for managing the Yourplug affiliate marketing platform.
 
 ## Tech Stack
 
@@ -172,7 +172,7 @@ Required environment variables:
 NUXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NUXT_PUBLIC_SUPABASE_KEY=your-anon-key
 SUPABASE_SECRET_KEY=your-service-role-key
-API_BASE_URL=https://api.swordfighters.com
+API_BASE_URL=https://api.yourplug.app
 NODE_ENV=production
 ```
 

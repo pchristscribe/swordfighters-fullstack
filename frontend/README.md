@@ -1,6 +1,6 @@
-# Swordfighters User Frontend
+# Yourplug User Frontend
 
-User-facing product catalog for the Swordfighters affiliate marketing platform.
+User-facing product catalog for the Yourplug affiliate marketing platform.
 
 ## Tech Stack
 

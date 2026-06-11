@@ -1,4 +1,4 @@
--- Swordfighters App - Initial Schema
+-- Yourplug App - Initial Schema
 -- Supabase Project: oqkfirmzkdfkfcvzqipo
 
 -- Enable UUID generation
